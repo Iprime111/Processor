@@ -1,0 +1,13 @@
+[submodule "SimpleStack"]
+	path = SimpleStack
+	url = https://github.com/Iprime111/SimpleStack.git
+	branch = stack-lib
+[submodule "CustomAssert"]
+	path = CustomAssert
+	url = https://github.com/Iprime111/CustomAssert.git
+[submodule "ConsoleParser"]
+	path = ConsoleParser
+	url = https://github.com/Iprime111/ConsoleParser.git
+[submodule "FileIO"]
+	path = FileIO
+	url = https://github.com/Iprime111/FileIO.git
