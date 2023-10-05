@@ -35,6 +35,16 @@ static Stack ProcessorStack = {};
                 }                                                       \
             }while (0)
 
+#define INSTRUCTION(NAME, NUMBER, ARUMENTS_COUNT, SCANF_SPECIFIERS, PROCESSOR_CALLBACK, ...)    \
+            INSTRUCTION_CALLBACK_FUNCTION (NAME) {                                              \
+                PushLog (3);                                                                    \
+                do                                                                              \
+                PROCESSOR_CALLBACK                                                              \
+                while (0);                                                                      \
+                RETURN NO_PROCESSOR_ERRORS;                                                     \
+            }
+
+
 static ProcessorErrorCode ReadInstruction ();
 
 ProcessorErrorCode ExecuteFile (FileBuffer *file) {
@@ -72,133 +82,4 @@ static ProcessorErrorCode ReadInstruction () {
 
 // Processor instructions
 
-INSTRUCTION_CALLBACK_FUNCTION (push) {
-    PushLog (3);
-
-    CheckBuffer (Bytecode);
-
-    elem_t value = *(elem_t *) (Bytecode->buffer + CurrentChar);
-    CurrentChar += sizeof (elem_t);
-
-    PushValue (value);
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-INSTRUCTION_CALLBACK_FUNCTION (out) {
-    PushLog (3);
-
-    elem_t value {};
-    PopValue(&value);
-
-    PrintData (CONSOLE_DEFAULT, CONSOLE_NORMAL, stdout, value);
-    fputs ("\n", stdout);
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-INSTRUCTION_CALLBACK_FUNCTION (hlt) {
-    PushLog (3);
-    RETURN PROCESSOR_HALT;
-}
-
-INSTRUCTION_CALLBACK_FUNCTION (in) {
-    PushLog (3);
-
-    elem_t value {};
-
-    printf_color (CONSOLE_WHITE, CONSOLE_BOLD, "Enter value: ");
-    scanf ("%llu", &value);
-
-    PushValue (value);
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-INSTRUCTION_CALLBACK_FUNCTION (add) {
-    PushLog (3);
-
-    elem_t value1 {}, value2{};
-
-    PopValue (&value1);
-    PopValue (&value2);
-
-    PushValue (value1 + value2);
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-INSTRUCTION_CALLBACK_FUNCTION (sub) {
-    PushLog (3);
-
-    elem_t value1 {}, value2{};
-
-    PopValue (&value1);
-    PopValue (&value2);
-
-    PushValue (value2 - value1);
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-INSTRUCTION_CALLBACK_FUNCTION (mul) {
-    PushLog (3);
-
-    elem_t value1 {}, value2{};
-
-    PopValue (&value1);
-    PopValue (&value2);
-
-    PushValue (value1 * value2);
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-INSTRUCTION_CALLBACK_FUNCTION (div) {
-    PushLog (3);
-
-    elem_t value1 {}, value2{};
-
-    PopValue (&value1);
-    PopValue (&value2);
-
-    PushValue (value2 / value1);
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-INSTRUCTION_CALLBACK_FUNCTION (sin) {
-    PushLog (3);
-
-    elem_t value {};
-
-    PopValue (&value);
-
-    PushValue (sin (value));
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-INSTRUCTION_CALLBACK_FUNCTION (cos) {
-    PushLog (3);
-
-    elem_t value {};
-
-    PopValue (&value);
-
-    PushValue (cos (value));
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-INSTRUCTION_CALLBACK_FUNCTION (sqrt) {
-    PushLog (3);
-
-    elem_t value {};
-
-    PopValue (&value);
-
-    PushValue (sqrt (value));
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
+#include "Instructions.h"

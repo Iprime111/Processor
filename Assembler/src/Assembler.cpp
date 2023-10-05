@@ -93,7 +93,7 @@ static ProcessorErrorCode WriteArguments (int outFileDescriptor, const Assembler
     char sscanfBuffer [MAX_INSTRUCTION_LENGTH + 1] = "";
 
     for (size_t argumentIndex = 0; argumentIndex < instruction->argumentsCount; argumentIndex++) {
-        int currentOffset =0;
+        int currentOffset = 0;
 
         char printfSpecifier [8] = "";
         strcat (printfSpecifier, instruction->argumentsScanfSpecifiers [argumentIndex]);
@@ -150,15 +150,9 @@ static ssize_t FindActualStringEnd (TextLine *line) {
     RETURN 0;
 }
 
+#define INSTRUCTION(INSTRUCTION_NAME, INSTRUCTION_NUMBER, ARGUMENTS_COUNT, SCANF_SPECIFIERS, ...)   \
+            INSTRUCTION_CALLBACK_FUNCTION (INSTRUCTION_NAME) {}
 
-INSTRUCTION_CALLBACK_FUNCTION (in) {}
-INSTRUCTION_CALLBACK_FUNCTION (hlt) {}
-INSTRUCTION_CALLBACK_FUNCTION (out) {}
-INSTRUCTION_CALLBACK_FUNCTION (push) {}
-INSTRUCTION_CALLBACK_FUNCTION (add) {}
-INSTRUCTION_CALLBACK_FUNCTION (sub) {}
-INSTRUCTION_CALLBACK_FUNCTION (mul) {}
-INSTRUCTION_CALLBACK_FUNCTION (div) {}
-INSTRUCTION_CALLBACK_FUNCTION (sin) {}
-INSTRUCTION_CALLBACK_FUNCTION (cos) {}
-INSTRUCTION_CALLBACK_FUNCTION (sqrt) {}
+#include "Instructions.h"
+
+#undef INSTRUCTION
