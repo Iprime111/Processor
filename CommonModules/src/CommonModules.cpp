@@ -1,6 +1,27 @@
-#include "CommonModules.h"
+#include <string.h>
 
-struct AssemblerInstruction AvailableInstructions [] = {
-                                INSTRUCTION (hlt, 0, 0), INSTRUCTION (out, -1, 0), INSTRUCTION (in, -2, 0), INSTRUCTION (push, -3, 1), INSTRUCTION (pop, -4, 0), INSTRUCTION (add, 1, 0),
-                                INSTRUCTION (sub, 2, 0), INSTRUCTION (mul, 3, 0),  INSTRUCTION (div, 4, 0), INSTRUCTION (sin, 5, 0),   INSTRUCTION (cos, 6, 0),  INSTRUCTION (sqrt, 7, 0)
-                            };
+#include "CommonModules.h"
+#include "CustomAssert.h"
+
+#define  FindInstruction(predicate)                                                                                                                         \
+            do {                                                                                                                                            \
+                for (size_t instructionIndex = 0; instructionIndex < sizeof (AvailableInstructions) / sizeof (AssemblerInstruction); instructionIndex++) {  \
+                    if (predicate) {                                                                                                                        \
+                        RETURN AvailableInstructions + instructionIndex;                                                                                    \
+                    }                                                                                                                                       \
+                }                                                                                                                                           \
+                RETURN NULL;                                                                                                                                \
+            }while (0)                                                                                                                                      \
+
+
+const AssemblerInstruction *FindInstructionByName (char *name) {
+    PushLog (4);
+
+    FindInstruction (strcmp(AvailableInstructions [instructionIndex].instructionName, name) == 0);
+}
+
+const AssemblerInstruction *FindInstructionByNumber (int instruction) {
+    PushLog (4);
+
+    FindInstruction (AvailableInstructions [instructionIndex].instruction == instruction);
+}

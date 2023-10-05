@@ -11,3 +11,6 @@
 [submodule "FileIO"]
 	path = FileIO
 	url = https://github.com/Iprime111/FileIO.git
+[submodule "ColorConsole"]
+	path = ColorConsole
+	url = https://github.com/Iprime111/ColorConsole

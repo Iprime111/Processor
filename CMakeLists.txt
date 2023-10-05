@@ -8,6 +8,7 @@ add_compile_definitions (_SHOW_STACK_TRACE)
 
 project (processor)
 
+add_subdirectory (ColorConsole)
 add_subdirectory (ConsoleParser)
 add_subdirectory (SimpleStack)
 add_subdirectory (CustomAssert)
@@ -15,5 +16,6 @@ add_subdirectory (FileIO)
 
 add_subdirectory (CommonModules)
 add_subdirectory (SoftProcessor)
+add_subdirectory (Assembler)
 
 

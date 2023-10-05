@@ -6,6 +6,7 @@
 #include "FileIO.h"
 #include "ConsoleParser.h"
 #include "Logger.h"
+#include "SoftProcessor.h"
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 
@@ -14,40 +15,38 @@ const size_t MAX_BINARY_FILES = 1024;
 static char *BinaryFiles [MAX_BINARY_FILES] = {};
 static size_t BinaryCount = 0;
 
-
 void AddBinary (char **arguments);
-static int IsRegularFile (const char *path);
 
 int main (int argc, char **argv){
     PushLog (1);
 
     //Process console line arguments
-    register_flag ("b", "binary", AddBinary, 1);
+    register_flag ("-b", "--binary", AddBinary, 1);
     parse_flags (argc, argv);
 
     //Read binary files
     FileBuffer fileBuffer = {};
 
     for (size_t fileIndex = 0; fileIndex < BinaryCount; fileIndex++) {
-        CreateFileBuffer (&fileBuffer, BinaryFiles [fileIndex]);
-        ReadFile (BinaryFiles [fileIndex], &fileBuffer);
+        if (!CreateFileBuffer (&fileBuffer, BinaryFiles [fileIndex])) {
 
-        
+            DestroyFileBuffer (&fileBuffer);
+            continue;
+        }
+
+        if (!ReadFile (BinaryFiles [fileIndex], &fileBuffer)) {
+
+            DestroyFileBuffer (&fileBuffer);
+            continue;
+        }
+
+        ExecuteFile (&fileBuffer);
 
         DestroyFileBuffer (&fileBuffer);
     }
 
 
     RETURN 0;
-}
-
-static int IsRegularFile (const char *path) {
-    struct stat stats;
-
-    if (stat(path, &stats) < 0)
-        return -1;
-
-    return S_ISREG(stats.st_mode);
 }
 
 void AddBinary (char **arguments) {

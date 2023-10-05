@@ -2,6 +2,9 @@ project (SoftProcessor)
 
 add_executable (${PROJECT_NAME} main.cpp)
 
+add_subdirectory (src)
+
+target_link_libraries (${PROJECT_NAME} PRIVATE ColorConsole)
 target_link_libraries (${PROJECT_NAME} PRIVATE CustomAssert)
 target_link_libraries (${PROJECT_NAME} PRIVATE ConsoleParser)
 target_link_libraries (${PROJECT_NAME} PRIVATE Stack)

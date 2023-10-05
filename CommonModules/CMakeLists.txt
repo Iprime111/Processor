@@ -2,4 +2,5 @@ project (CommonModules)
 
 add_library (CommonModules src/CommonModules.cpp)
 
-target_include_directories (${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
+target_link_libraries (CommonModules PRIVATE CustomAssert)
+target_include_directories (CommonModules PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/headers)
