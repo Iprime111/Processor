@@ -11,6 +11,7 @@
 static FileBuffer *Bytecode;
 static size_t CurrentChar = 0;
 static Stack ProcessorStack = {};
+static elem_t RegisterValues [4] = {0, 0, 0, 0};
 
 #define CheckBuffer(fileBuffer)                                                                 \
             do {                                                                                \
@@ -35,7 +36,7 @@ static Stack ProcessorStack = {};
                 }                                                       \
             }while (0)
 
-#define INSTRUCTION(NAME, NUMBER, ARUMENTS_COUNT, SCANF_SPECIFIERS, PROCESSOR_CALLBACK, ...)    \
+#define INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)                       \
             INSTRUCTION_CALLBACK_FUNCTION (NAME) {                                              \
                 PushLog (3);                                                                    \
                 do                                                                              \
@@ -43,6 +44,8 @@ static Stack ProcessorStack = {};
                 while (0);                                                                      \
                 RETURN NO_PROCESSOR_ERRORS;                                                     \
             }
+
+#define ReadData(type)  *(type *) (Bytecode->buffer + CurrentChar); CurrentChar += sizeof (type)
 
 
 static ProcessorErrorCode ReadInstruction ();
@@ -68,18 +71,16 @@ static ProcessorErrorCode ReadInstruction () {
 
     CheckBuffer (Bytecode);
 
-    int instructionNumber = *(long long *) (Bytecode->buffer + CurrentChar);
-    CurrentChar += sizeof (long long);
-
-    const AssemblerInstruction *instruction = FindInstructionByNumber (instructionNumber);
+    CommandCode commandCode = ReadData (CommandCode);
+    const AssemblerInstruction *instruction = FindInstructionByNumber (commandCode.opcode);
 
     if (instruction == NULL){
         RETURN WRONG_INSTRUCTION;
     }
 
-    RETURN instruction->callbackFunction ();
+    RETURN instruction->callbackFunction (&commandCode);
 }
 
 // Processor instructions
 
-#include "Instructions.h"
+#include "Instructions.def"

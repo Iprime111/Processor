@@ -20,24 +20,27 @@ enum ProcessorErrorCode {
     OUTPUT_FILE_ERROR   = 1 << 8,
 };
 
-typedef ProcessorErrorCode (*callbackFunction_t)();
+struct CommandCode {
+    int opcode              : 4;
+    int hasImmedArgument    : 1;
+    int hasRegisterArgument : 1;
+};
+
+typedef ProcessorErrorCode (*callbackFunction_t)(CommandCode *commandCode);
 
 struct AssemblerInstruction {
     const char *instructionName;
-    const long long instruction;
-
-    const unsigned int argumentsCount;
-    const char *argumentsScanfSpecifiers [MAX_ARGUMENTS_COUNT];
+    CommandCode commandCode;
 
     callbackFunction_t callbackFunction;
 };
 
-#define INSTRUCTION_CALLBACK_FUNCTION(INSTRUCTION_NAME) ProcessorErrorCode INSTRUCTION_NAME##Callback ()
+#define INSTRUCTION_CALLBACK_FUNCTION(INSTRUCTION_NAME) ProcessorErrorCode INSTRUCTION_NAME##Callback (CommandCode *commandCode)
 
-#define INSTRUCTION(INSTRUCTION_NAME, INSTRUCTION_NUMBER, ARGUMENTS_COUNT, SCANF_SPECIFIERS, ...)   \
+#define INSTRUCTION(INSTRUCTION_NAME, ...)   \
             INSTRUCTION_CALLBACK_FUNCTION (INSTRUCTION_NAME);
 
-#include "Instructions.h"
+#include "Instructions.def"
 
 #undef INSTRUCTION
 

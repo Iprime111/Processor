@@ -1,6 +1,7 @@
 #include <cstring>
 #include <ctype.h>
 #include <stdio.h>
+#include <sys/types.h>
 
 
 #include "Assembler.h"
@@ -12,10 +13,12 @@
 #include "Stack/Stack.h"
 
 static ProcessorErrorCode CompileLine (TextLine *line, int outFileDescriptor);
-static ProcessorErrorCode CheckArgumentsCount (TextLine *line, const AssemblerInstruction *instruction);
-static ProcessorErrorCode WriteArguments (int outFileDescriptor, const AssemblerInstruction *instruction, TextLine *line, int initialOffset);
+static ProcessorErrorCode WriteInstructionData (int outFileDescriptor, const AssemblerInstruction *instruction, TextLine *line, int initialOffset);
+static ProcessorErrorCode GetInstructionData (TextLine *line, const AssemblerInstruction **instruction, int *offset);
+
 static ssize_t CountWhitespaces (TextLine *line);
 static ssize_t FindActualStringEnd (TextLine *line);
+static ssize_t FindActualStringBegin (TextLine *line);
 
 ProcessorErrorCode AssembleFile (TextBuffer *file, int outFileDescriptor) {
     PushLog (1);
@@ -38,80 +41,128 @@ static ProcessorErrorCode CompileLine (TextLine *line, int outFileDescriptor) {
     custom_assert (line,          pointer_is_null, NO_BUFFER);
     custom_assert (line->pointer, pointer_is_null, NO_BUFFER);
 
+    ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
+
+    // Get instruction basic data
+    const AssemblerInstruction *instruction = NULL;
+    int argumentsOffset = 0;
+
+    if ((errorCode = GetInstructionData (line, &instruction, &argumentsOffset)) != NO_PROCESSOR_ERRORS) {
+        RETURN errorCode;
+    }
+
+    printf ("Instruction found: %s. Arguments: ", instruction->instructionName);
+
+    WriteInstructionData (outFileDescriptor, instruction, line, argumentsOffset);
+
+    RETURN NO_PROCESSOR_ERRORS;
+}
+
+static ProcessorErrorCode GetInstructionData (TextLine *line, const AssemblerInstruction **instruction, int *offset) {
+    PushLog (3);
+
+    custom_assert (instruction, pointer_is_null, WRONG_INSTRUCTION);
+    custom_assert (line,        pointer_is_null, NO_BUFFER);
+
     char sscanfBuffer [MAX_INSTRUCTION_LENGTH + 1] = "";
 
-    int offset = 0;
-    int sscanfResult = sscanf (line->pointer, "%s%n", sscanfBuffer, &offset);
+    int sscanfResult = sscanf (line->pointer, "%s%n", sscanfBuffer, offset);
 
     if (sscanfResult <= 0 || sscanfResult == EOF) {
         RETURN NO_BUFFER;
     }
 
-    const AssemblerInstruction *instruction = FindInstructionByName (sscanfBuffer);
+    *instruction = FindInstructionByName (sscanfBuffer);
 
-    if (instruction == NULL) {
+    if (!*instruction) {
         RETURN WRONG_INSTRUCTION;
-    }
-
-    printf ("Instruction found: %s. Arguments: ", instruction->instructionName);
-    if (!WriteBuffer (outFileDescriptor, (const char *) &instruction->instruction, sizeof (long long))) {
-        RETURN OUTPUT_FILE_ERROR;
-    }
-
-    RETURN WriteArguments (outFileDescriptor, instruction, line, offset);
-}
-
-static ProcessorErrorCode CheckArgumentsCount (TextLine *line, const AssemblerInstruction *instruction) {
-    PushLog (3);
-    custom_assert (line,        pointer_is_null, NO_BUFFER);
-    custom_assert (instruction, pointer_is_null, WRONG_INSTRUCTION);
-
-    ssize_t whitespaceCount = CountWhitespaces (line);
-
-    if (whitespaceCount < instruction->argumentsCount) {
-        RETURN TOO_FEW_ARGUMENTS;
-    }
-
-    if (whitespaceCount > instruction->argumentsCount) {
-        RETURN TOO_MANY_ARGUMENTS;
     }
 
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode WriteArguments (int outFileDescriptor, const AssemblerInstruction *instruction, TextLine *line, int initialOffset) {
+static ProcessorErrorCode WriteInstructionData (int outFileDescriptor, const AssemblerInstruction *instruction, TextLine *line, int initialOffset) {
     PushLog (3);
     custom_assert (line,        pointer_is_null, NO_BUFFER);
     custom_assert (instruction, pointer_is_null, WRONG_INSTRUCTION);
 
-    ProcessorErrorCode errorCode = CheckArgumentsCount (line, instruction);
+    ssize_t argumentsCount = CountWhitespaces (line);
 
-    if (errorCode != NO_PROCESSOR_ERRORS){
-        RETURN errorCode;
+    if (argumentsCount < 0) {
+        RETURN TOO_FEW_ARGUMENTS;
     }
 
-    char sscanfBuffer [MAX_INSTRUCTION_LENGTH + 1] = "";
+    CommandCode commandCode {};
+    commandCode.opcode = instruction->commandCode.opcode;
 
-    for (size_t argumentIndex = 0; argumentIndex < instruction->argumentsCount; argumentIndex++) {
-        int currentOffset = 0;
+    char registerChar  = 0;
+    int  readedSymbols = 0;
+    elem_t immedArgument = 0;
 
-        char printfSpecifier [8] = "";
-        strcat (printfSpecifier, instruction->argumentsScanfSpecifiers [argumentIndex]);
-        strcat (printfSpecifier, "%n");
+    // TODO plus sign
 
-        if (sscanf (line->pointer + initialOffset, printfSpecifier, sscanfBuffer, &initialOffset) != 1) {
-            RETURN TOO_FEW_ARGUMENTS;
-        }
+    switch (argumentsCount) {
+        case 0:
+            break;
 
-        initialOffset += currentOffset;
+        case 1:
+            if (sscanf (line->pointer + initialOffset, "%lld", &immedArgument) == 1){
+                commandCode.hasImmedArgument = true;
 
-        if (!WriteBuffer (outFileDescriptor, sscanfBuffer, sizeof (elem_t))) {
-            RETURN OUTPUT_FILE_ERROR;
-        }
+            } else if (sscanf (line->pointer + initialOffset, "r%cx%n", &registerChar, &readedSymbols) == 1 && readedSymbols == 3) {
+                if (registerChar >= 'a' && registerChar <= 'd') {
+                    RETURN TOO_FEW_ARGUMENTS;
+                }
 
-        printf (instruction->argumentsScanfSpecifiers [argumentIndex],  *(elem_t *) sscanfBuffer);
-        printf (" (size: %lu), ", sizeof (elem_t));
+                commandCode.hasRegisterArgument = true;
+
+            }else {
+                RETURN TOO_FEW_ARGUMENTS;
+            }
+            break;
+
+        case 2:
+            commandCode.hasImmedArgument = true;
+            commandCode.hasRegisterArgument = true;
+            break;
+
+        default:
+            RETURN TOO_MANY_ARGUMENTS;
+            break;
     }
+
+    #define WriteDataToBuffer(data, size)                           \
+        do {                                                        \
+            if (!WriteBuffer (outFileDescriptor, data, size)) {     \
+                RETURN OUTPUT_FILE_ERROR;                           \
+            }                                                       \
+        } while (0)
+
+    WriteDataToBuffer ((char *) &commandCode, sizeof (CommandCode));
+
+    if (commandCode.hasRegisterArgument) {
+        registerChar -= 'a';
+
+        WriteDataToBuffer (&registerChar, sizeof (char));
+
+        printf ("r%cx (size = %lu) ", registerChar + 'a', sizeof (char));
+    }
+
+    if (commandCode.hasImmedArgument) {
+        WriteDataToBuffer ((char *) &immedArgument, sizeof (elem_t));
+
+        printf ("%llu (size = %lu)", immedArgument, sizeof (elem_t));
+    }
+
+    #define INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)   \
+                if (commandCode.opcode = OPCODE)                                \
+                    ASSEMBLER_CALLBACK                                          \
+
+
+    #include "Instructions.def"
+
+    #undef INSTRUCTION
+    #undef WriteDataToBuffer
 
     printf ("\n");
 
@@ -124,10 +175,16 @@ static ssize_t CountWhitespaces (TextLine *line) {
     custom_assert (line,          pointer_is_null, -1);
     custom_assert (line->pointer, pointer_is_null, -1);
 
-    ssize_t lineLength = FindActualStringEnd (line);
+    ssize_t lineBegin = FindActualStringBegin (line);
+    ssize_t lineEnd   = FindActualStringEnd   (line);
+
+    if (lineBegin < 0 || lineEnd < 0) {
+        RETURN -1;
+    }
+
     ssize_t spaceCount = 0;
 
-    for (int charIndex = 0; charIndex < lineLength; charIndex++) {
+    for (ssize_t charIndex = lineBegin; charIndex < lineEnd; charIndex++) {
         if (isspace (line->pointer [charIndex]))
             spaceCount++;
     }
@@ -135,24 +192,36 @@ static ssize_t CountWhitespaces (TextLine *line) {
     RETURN spaceCount;
 }
 
+#define DetectWhitespacePosition(FOR_PREDICATE)                 \
+            custom_assert (line,          pointer_is_null, -1); \
+            custom_assert (line->pointer, pointer_is_null, -1); \
+            for (FOR_PREDICATE) {                               \
+                if (!isspace (line->pointer [charPointer])){    \
+                    RETURN (ssize_t) charPointer;               \
+                }                                               \
+            }                                                   \
+            RETURN -1
+
+// TODO add comments functionality
 static ssize_t FindActualStringEnd (TextLine *line) {
     PushLog (3);
 
-    custom_assert (line,          pointer_is_null, -1);
-    custom_assert (line->pointer, pointer_is_null, -1);
-
-    for (size_t charPointer = line->length; charPointer >= 0; charPointer--) {
-        if (!isspace (line->pointer [charPointer])){
-            RETURN (ssize_t) charPointer;
-        }
-    }
-
-    RETURN 0;
+    DetectWhitespacePosition (size_t charPointer = line->length; charPointer >= 0; charPointer--);
 }
+
+static ssize_t FindActualStringBegin (TextLine *line) {
+    PushLog (3);
+
+    DetectWhitespacePosition (size_t charPointer = 0; charPointer < line->length; charPointer++);
+}
+
+#undef DetectWhitespacePosition
+
+// Instruction callback functions
 
 #define INSTRUCTION(INSTRUCTION_NAME, INSTRUCTION_NUMBER, ARGUMENTS_COUNT, SCANF_SPECIFIERS, ...)   \
             INSTRUCTION_CALLBACK_FUNCTION (INSTRUCTION_NAME) {}
 
-#include "Instructions.h"
+#include "Instructions.def"
 
 #undef INSTRUCTION
