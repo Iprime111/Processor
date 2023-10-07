@@ -41,8 +41,6 @@ ProcessorErrorCode ExecuteFile (SPU *spu) {
     spu->currentChar = 0;
     CheckBuffer (spu);
 
-
-
     StackInitDefault_ (&spu->processorStack);
 
     while (ReadInstruction(spu) == NO_PROCESSOR_ERRORS);
@@ -60,7 +58,7 @@ static ProcessorErrorCode ReadInstruction (SPU *spu) {
     printf ("Reading command: ");
 
     CommandCode commandCode {};
-    ReadData (spu, &commandCode, CommandCode);
+    ReadData (spu, &commandCode, char);
 
     const AssemblerInstruction *instruction = FindInstructionByNumber (commandCode.opcode);
 

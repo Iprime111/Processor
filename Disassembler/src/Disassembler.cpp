@@ -20,11 +20,7 @@ ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
     spu->currentChar = 0;
     CheckBuffer (spu);
 
-    StackInitDefault_ (&spu->processorStack);
-
     while (ReadInstruction(outFileDescriptor, spu) == NO_PROCESSOR_ERRORS);
-
-    StackDestruct_ (&spu->processorStack);
 
     RETURN NO_PROCESSOR_ERRORS;
 }
@@ -37,11 +33,11 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
     printf ("Reading command: ");
 
     CommandCode commandCode {};
-    ReadData (spu, &commandCode, CommandCode);
+    ReadData (spu, &commandCode, char);
 
     const AssemblerInstruction *instruction = FindInstructionByNumber (commandCode.opcode);
 
-    if (instruction == NULL){
+    if (!instruction){
         RETURN WRONG_INSTRUCTION;
     }
 
@@ -50,11 +46,11 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
     char commandLine [MAX_INSTRUCTION_LENGTH] = "";
     strcat (commandLine, instruction->instructionName);
 
-    int registerIndex = -1;
+    char registerIndex = -1;
     elem_t immedArgument = 0;
 
     if (commandCode.hasImmedArgument && commandCode.hasRegisterArgument) {
-        ReadData (spu, &registerIndex, int);
+        ReadData (spu, &registerIndex, char);
         ReadData (spu, &immedArgument, elem_t);
 
         sprintf (commandLine, "%s r%cx+%lf\n", instruction->instructionName, registerIndex + 'a', immedArgument);
@@ -63,7 +59,7 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
 
         sprintf (commandLine, "%s %lf\n", instruction->instructionName, immedArgument);
     }else if (commandCode.hasRegisterArgument){
-        ReadData (spu, &registerIndex, int);
+        ReadData (spu, &registerIndex, char);
 
         sprintf (commandLine, "%s r%cx\n", instruction->instructionName, registerIndex + 'a');
     }else {
@@ -78,8 +74,10 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-#define INSTRUCTION(INSTRUCTION_NAME, ...)   \
-            INSTRUCTION_CALLBACK_FUNCTION (INSTRUCTION_NAME) {}
+#define INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)                       \
+            INSTRUCTION_CALLBACK_FUNCTION (NAME) {                                              \
+                return NO_PROCESSOR_ERRORS;                                                     \
+            }
 
 #include "Instructions.def"
 

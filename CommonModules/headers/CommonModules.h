@@ -2,6 +2,8 @@
 #define COMMON_MODULES_H_
 
 #include <stddef.h>
+#include "CustomAssert.h"
+#include "Logger.h"
 #include "SPU.h"
 
 const long long FIXED_FLOAT_PRECISION = 1e3;
@@ -53,13 +55,20 @@ bool CopyVariableValue (void *destination, void *source, size_t size);
             do {                                                                                    \
                 custom_assert ((spu)->bytecode,                   pointer_is_null, NO_BUFFER);      \
                 custom_assert ((spu)->bytecode->buffer_size >= 0, invalid_value,   BUFFER_ENDED);   \
-                if ((size_t) (spu)->bytecode->buffer_size - sizeof (int) < spu->currentChar) {      \
-                    RETURN BUFFER_ENDED;                                                            \
-                }                                                                                   \
             }while (0)
 
 
-#define ReadData(spu, destination, type) CopyVariableValue (destination, (spu)->bytecode->buffer + (spu)->currentChar, sizeof (type)); (spu)->currentChar += sizeof (type)
+#define ReadData(spu, destination, type)                                        \
+        do {                                                                    \
+            char *bufferPointer = (spu)->bytecode->buffer + (spu)->currentChar; \
+            custom_assert (bufferPointer, pointer_is_null, NO_BUFFER);          \
+            if ((spu)->currentChar >= (spu)->bytecode->buffer_size) {           \
+                RETURN BUFFER_ENDED;                                            \
+            }                                                                   \
+            CopyVariableValue (destination, bufferPointer, sizeof (type));      \
+            (spu)->currentChar += sizeof (type);                                \
+        }while (0)
+
 
 
 #endif

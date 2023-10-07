@@ -28,15 +28,15 @@ INSTRUCTION (push, 3, {
     elem_t value = 0;
 
     if (commandCode->hasImmedArgument && commandCode->hasRegisterArgument){
-        int registerIndex = -1;
-        ReadData (spu, &registerIndex, int);
+        char registerIndex = -1;
+        ReadData (spu, &registerIndex, char);
         ReadData (spu, &value,         elem_t);
 
         value += spu->registerValues [registerIndex];
 
     }else if (commandCode->hasRegisterArgument){
-        int registerIndex = -1;
-        ReadData (spu, &registerIndex, int);
+        char registerIndex = -1;
+        ReadData (spu, &registerIndex, char);
 
         value = spu->registerValues [registerIndex];
     }else if (commandCode->hasImmedArgument) {
@@ -50,8 +50,8 @@ INSTRUCTION (push, 3, {
 
 INSTRUCTION (pop, 4, {
     if (commandCode->hasRegisterArgument){
-        int registerIndex = -1;
-        ReadData (spu, &registerIndex, int);
+        char registerIndex = -1;
+        ReadData (spu, &registerIndex, char);
 
         PopValue (spu, spu->registerValues + registerIndex);
     } else {
