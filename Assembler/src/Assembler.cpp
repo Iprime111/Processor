@@ -104,6 +104,16 @@ static ProcessorErrorCode WriteInstructionData (int outFileDescriptor, const Ass
     ssize_t offset = FindActualStringBegin (&argsLine) + initialOffset;
 
     switch (argumentsCount) {
+        case 2:
+            if (sscanf (line->pointer + offset, "r%cx+%lf", &registerChar, &immedArgument) == 2) {
+                commandCode.hasImmedArgument = true;
+                commandCode.hasRegisterArgument = true;
+            }else {
+                RETURN TOO_FEW_ARGUMENTS;
+            }
+
+            break;
+
         case 0:
             break;
 
@@ -122,11 +132,6 @@ static ProcessorErrorCode WriteInstructionData (int outFileDescriptor, const Ass
 
                 RETURN TOO_FEW_ARGUMENTS;
             }
-            break;
-
-        case 2:
-            commandCode.hasImmedArgument = true;
-            commandCode.hasRegisterArgument = true;
             break;
 
         default:
@@ -188,7 +193,7 @@ static ssize_t CountWhitespaces (TextLine *line) {
     ssize_t spaceCount = 0;
 
     for (ssize_t charIndex = lineBegin; charIndex < lineEnd; charIndex++) {
-        if (isspace (line->pointer [charIndex]))
+        if (isspace (line->pointer [charIndex]) || line->pointer [charIndex] == '+')
             spaceCount++;
     }
 

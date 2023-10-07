@@ -1,0 +1,124 @@
+//INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)
+
+INSTRUCTION (hlt, 0, {
+    RETURN PROCESSOR_HALT;
+}, {})
+
+INSTRUCTION (out, 1, {
+    elem_t value {};
+    PopValue(spu, &value);
+
+    PrintData (CONSOLE_DEFAULT, CONSOLE_BOLD, stdout, value);
+    fputs ("\n", stdout);
+}, {})
+
+INSTRUCTION (in, 2, {
+    elem_t value {};
+
+    printf_color (CONSOLE_WHITE, CONSOLE_BOLD, "Enter value: ");
+    scanf ("%lf", &value);
+
+    PushValue (spu, value);
+
+}, {})
+
+INSTRUCTION (push, 3, {
+    CheckBuffer (spu);
+
+    elem_t value = 0;
+
+    if (commandCode->hasImmedArgument && commandCode->hasRegisterArgument){
+        int registerIndex = -1;
+        ReadData (spu, &registerIndex, int);
+        ReadData (spu, &value,         elem_t);
+
+        value += spu->registerValues [registerIndex];
+
+    }else if (commandCode->hasRegisterArgument){
+        int registerIndex = -1;
+        ReadData (spu, &registerIndex, int);
+
+        value = spu->registerValues [registerIndex];
+    }else if (commandCode->hasImmedArgument) {
+        ReadData (spu, &value, elem_t);
+    }else {
+        RETURN WRONG_INSTRUCTION;
+    }
+
+    PushValue (spu, value);
+}, {})
+
+INSTRUCTION (pop, 4, {
+    if (commandCode->hasRegisterArgument){
+        int registerIndex = -1;
+        ReadData (spu, &registerIndex, int);
+
+        PopValue (spu, spu->registerValues + registerIndex);
+    } else {
+        RETURN WRONG_INSTRUCTION;
+    }
+}, {})
+
+INSTRUCTION (add, 5, {
+    elem_t value1 {};
+    elem_t value2 {};
+
+    PopValue (spu, &value1);
+    PopValue (spu, &value2);
+
+    PushValue (spu, value1 + value2);
+}, {})
+
+INSTRUCTION (sub, 6, {
+    elem_t value1 {};
+    elem_t value2 {};
+
+    PopValue (spu, &value1);
+    PopValue (spu, &value2);
+
+    PushValue (spu, value2 - value1);
+}, {})
+
+INSTRUCTION (mul, 7, {
+    elem_t value1 {};
+    elem_t value2 {};
+
+    PopValue (spu, &value1);
+    PopValue (spu, &value2);
+
+    PushValue (spu, value1 * value2);
+}, {})
+
+INSTRUCTION (div, 8, {
+    elem_t value1 {};
+    elem_t value2 {};
+
+    PopValue (spu, &value1);
+    PopValue (spu, &value2);
+
+    PushValue (spu, value2 / value1);
+}, {})
+
+INSTRUCTION (sin, 9, {
+    elem_t value {};
+
+    PopValue (spu, &value);
+
+    PushValue (spu, sin (value));
+}, {})
+
+INSTRUCTION (cos, 10, {
+    elem_t value {};
+
+    PopValue (spu, &value);
+
+    PushValue (spu, cos (value));
+}, {})
+
+INSTRUCTION (sqrt, 11, {
+    elem_t value {};
+
+    PopValue (spu, &value);
+
+    PushValue (spu, sqrt (value));
+}, {})

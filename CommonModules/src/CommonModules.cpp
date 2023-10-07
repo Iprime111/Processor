@@ -37,3 +37,23 @@ const AssemblerInstruction *FindInstructionByNumber (int instruction) {
 
     FindInstruction ((int) AvailableInstructions [instructionIndex].commandCode.opcode == instruction);
 }
+
+bool CopyVariableValue (void *destination, void *source, size_t size) {
+    PushLog (4);
+
+    custom_assert (destination, pointer_is_null, false);
+    custom_assert (source,      pointer_is_null, false);
+
+    if (destination == source) {
+        RETURN true;
+    }
+
+    char *destinationPointer = (char *) destination;
+    char *sourcePointer = (char *) source;
+
+    for (size_t dataChunk = 0; dataChunk < size; dataChunk++) {
+        *(destinationPointer + dataChunk) = *(sourcePointer + dataChunk);
+    }
+
+    RETURN true;
+}

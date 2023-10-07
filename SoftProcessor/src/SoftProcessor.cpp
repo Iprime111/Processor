@@ -10,15 +10,6 @@
 #include "Stack/Stack.h"
 #include "SPU.h"
 
-#define CheckBuffer(spu)                                                                            \
-            do {                                                                                    \
-                custom_assert ((spu)->bytecode,                   pointer_is_null, NO_BUFFER);      \
-                custom_assert ((spu)->bytecode->buffer_size >= 0, invalid_value,   BUFFER_ENDED);   \
-                if ((size_t) (spu)->bytecode->buffer_size - sizeof (int) < spu->currentChar) {      \
-                    RETURN BUFFER_ENDED;                                                            \
-                }                                                                                   \
-            }while (0)
-
 #define PushValue(spu, value)                                                       \
             do {                                                                    \
                 if (StackPush_ (&((spu)->processorStack), value) != NO_ERRORS) {    \
@@ -42,11 +33,7 @@
                 RETURN NO_PROCESSOR_ERRORS;                                                     \
             }
 
-#define ReadData(spu, destination, type) CopyVariableValue (destination, (spu)->bytecode->buffer + (spu)->currentChar, sizeof (type)); (spu)->currentChar += sizeof (type)
-
-
 static ProcessorErrorCode ReadInstruction (SPU *spu);
-static bool CopyVariableValue (void *destination, void *source, size_t size);
 
 ProcessorErrorCode ExecuteFile (SPU *spu) {
     PushLog (1);
@@ -70,7 +57,7 @@ static ProcessorErrorCode ReadInstruction (SPU *spu) {
 
     CheckBuffer (spu);
 
-    printf ("Reading command: \n");
+    printf ("Reading command: ");
 
     CommandCode commandCode {};
     ReadData (spu, &commandCode, CommandCode);
@@ -84,26 +71,6 @@ static ProcessorErrorCode ReadInstruction (SPU *spu) {
     printf ("%s\n", instruction->instructionName);
 
     RETURN instruction->callbackFunction (spu, &commandCode);
-}
-
-static bool CopyVariableValue (void *destination, void *source, size_t size) {
-    PushLog (4);
-
-    custom_assert (destination, pointer_is_null, false);
-    custom_assert (source,      pointer_is_null, false);
-
-    if (destination == source) {
-        RETURN true;
-    }
-
-    char *destinationPointer = (char *) destination;
-    char *sourcePointer = (char *) source;
-
-    for (size_t dataChunk = 0; dataChunk < size; dataChunk++) {
-        *(destinationPointer + dataChunk) = *(sourcePointer + dataChunk);
-    }
-
-    RETURN true;
 }
 
 

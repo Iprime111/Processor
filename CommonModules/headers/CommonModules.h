@@ -47,5 +47,19 @@ struct AssemblerInstruction {
 
 const AssemblerInstruction *FindInstructionByName   (char *name);
 const AssemblerInstruction *FindInstructionByNumber (int instruction);
+bool CopyVariableValue (void *destination, void *source, size_t size);
+
+#define CheckBuffer(spu)                                                                            \
+            do {                                                                                    \
+                custom_assert ((spu)->bytecode,                   pointer_is_null, NO_BUFFER);      \
+                custom_assert ((spu)->bytecode->buffer_size >= 0, invalid_value,   BUFFER_ENDED);   \
+                if ((size_t) (spu)->bytecode->buffer_size - sizeof (int) < spu->currentChar) {      \
+                    RETURN BUFFER_ENDED;                                                            \
+                }                                                                                   \
+            }while (0)
+
+
+#define ReadData(spu, destination, type) CopyVariableValue (destination, (spu)->bytecode->buffer + (spu)->currentChar, sizeof (type)); (spu)->currentChar += sizeof (type)
+
 
 #endif
