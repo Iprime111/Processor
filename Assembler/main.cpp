@@ -33,8 +33,11 @@ int main (int argc, char **argv) {
         if (!ReadFileLines (SourceFiles [fileIndex], &fileBuffer, &textBuffer))
             shouldAssemble = false;
 
+        if (!ChangeNewLinesToZeroes (&textBuffer))
+            shouldAssemble = false;
+
         int outFileDescriptor = -1;
-        if ((outFileDescriptor = OpenFileWrite ("hui")) == -1)
+        if ((outFileDescriptor = OpenFileWrite ("test")) == -1)
             shouldAssemble = false;
 
         if (shouldAssemble) {

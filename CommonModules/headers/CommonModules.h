@@ -2,6 +2,7 @@
 #define COMMON_MODULES_H_
 
 #include <stddef.h>
+#include "SPU.h"
 
 const long long FIXED_FLOAT_PRECISION = 1e3;
 
@@ -26,7 +27,7 @@ struct CommandCode {
     int hasRegisterArgument : 1;
 };
 
-typedef ProcessorErrorCode (*callbackFunction_t)(CommandCode *commandCode);
+typedef ProcessorErrorCode (*callbackFunction_t)(SPU *spu, CommandCode *commandCode);
 
 struct AssemblerInstruction {
     const char *instructionName;
@@ -35,7 +36,7 @@ struct AssemblerInstruction {
     callbackFunction_t callbackFunction;
 };
 
-#define INSTRUCTION_CALLBACK_FUNCTION(INSTRUCTION_NAME) ProcessorErrorCode INSTRUCTION_NAME##Callback (CommandCode *commandCode)
+#define INSTRUCTION_CALLBACK_FUNCTION(INSTRUCTION_NAME) ProcessorErrorCode INSTRUCTION_NAME##Callback (SPU *spu, CommandCode *commandCode)
 
 #define INSTRUCTION(INSTRUCTION_NAME, ...)   \
             INSTRUCTION_CALLBACK_FUNCTION (INSTRUCTION_NAME);

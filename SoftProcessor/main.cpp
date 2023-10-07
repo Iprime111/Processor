@@ -6,6 +6,7 @@
 #include "FileIO.h"
 #include "ConsoleParser.h"
 #include "Logger.h"
+#include "SPU.h"
 #include "SoftProcessor.h"
 #include "TextTypes.h"
 #include "Stack/Stack.h"
@@ -40,7 +41,11 @@ int main (int argc, char **argv){
             continue;
         }
 
-        ExecuteFile (&fileBuffer);
+        SPU spu {
+            .bytecode = &fileBuffer,
+        };
+
+        ExecuteFile (&spu);
 
         DestroyFileBuffer (&fileBuffer);
     }

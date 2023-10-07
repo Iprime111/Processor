@@ -1,3 +1,5 @@
+#include <cstdio>
+
 #include "SoftProcessor.h"
 #include "ColorConsole.h"
 #include "CommonModules.h"
@@ -6,34 +8,29 @@
 #include "Stack/StackPrintf.h"
 #include "TextTypes.h"
 #include "Stack/Stack.h"
-#include <cstdio>
+#include "SPU.h"
 
-static FileBuffer *Bytecode;
-static size_t CurrentChar = 0;
-static Stack ProcessorStack = {};
-static elem_t RegisterValues [4] = {0, 0, 0, 0};
-
-#define CheckBuffer(fileBuffer)                                                                 \
-            do {                                                                                \
-                custom_assert (fileBuffer,                   pointer_is_null, NO_BUFFER);       \
-                custom_assert ((fileBuffer)->buffer_size >= 0, invalid_value,   BUFFER_ENDED);  \
-                if ((size_t) (fileBuffer)->buffer_size - sizeof (int) < CurrentChar) {          \
-                    RETURN BUFFER_ENDED;                                                        \
-                }                                                                               \
+#define CheckBuffer(spu)                                                                            \
+            do {                                                                                    \
+                custom_assert ((spu)->bytecode,                   pointer_is_null, NO_BUFFER);      \
+                custom_assert ((spu)->bytecode->buffer_size >= 0, invalid_value,   BUFFER_ENDED);   \
+                if ((size_t) (spu)->bytecode->buffer_size - sizeof (int) < spu->currentChar) {      \
+                    RETURN BUFFER_ENDED;                                                            \
+                }                                                                                   \
             }while (0)
 
-#define PushValue(value)                                                \
-            do {                                                        \
-                if (StackPush_ (&ProcessorStack, value) != NO_ERRORS) { \
-                    RETURN STACK_ERROR;                                 \
-                }                                                       \
+#define PushValue(spu, value)                                                       \
+            do {                                                                    \
+                if (StackPush_ (&((spu)->processorStack), value) != NO_ERRORS) {    \
+                    RETURN STACK_ERROR;                                             \
+                }                                                                   \
             }while (0)
 
-#define PopValue(value)                                                 \
-            do {                                                        \
-                if (StackPop_ (&ProcessorStack, value) != NO_ERRORS) {  \
-                    RETURN STACK_ERROR;                                 \
-                }                                                       \
+#define PopValue(spu, value)                                                        \
+            do {                                                                    \
+                if (StackPop_ (&((spu)->processorStack), value) != NO_ERRORS) {     \
+                    RETURN STACK_ERROR;                                             \
+                }                                                                   \
             }while (0)
 
 #define INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)                       \
@@ -45,41 +42,70 @@ static elem_t RegisterValues [4] = {0, 0, 0, 0};
                 RETURN NO_PROCESSOR_ERRORS;                                                     \
             }
 
-#define ReadData(type)  *(type *) (Bytecode->buffer + CurrentChar); CurrentChar += sizeof (type)
+#define ReadData(spu, destination, type) CopyVariableValue (destination, (spu)->bytecode->buffer + (spu)->currentChar, sizeof (type)); (spu)->currentChar += sizeof (type)
 
 
-static ProcessorErrorCode ReadInstruction ();
+static ProcessorErrorCode ReadInstruction (SPU *spu);
+static bool CopyVariableValue (void *destination, void *source, size_t size);
 
-ProcessorErrorCode ExecuteFile (FileBuffer *file) {
+ProcessorErrorCode ExecuteFile (SPU *spu) {
     PushLog (1);
 
-    CurrentChar = 0;
-    CheckBuffer (file);
-    Bytecode = file;
+    spu->currentChar = 0;
+    CheckBuffer (spu);
 
-    StackInitDefault_ (&ProcessorStack);
 
-    while (ReadInstruction() == NO_PROCESSOR_ERRORS);
 
-    StackDestruct_ (&ProcessorStack);
+    StackInitDefault_ (&spu->processorStack);
+
+    while (ReadInstruction(spu) == NO_PROCESSOR_ERRORS);
+
+    StackDestruct_ (&spu->processorStack);
 
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode ReadInstruction () {
+static ProcessorErrorCode ReadInstruction (SPU *spu) {
     PushLog (2);
 
-    CheckBuffer (Bytecode);
+    CheckBuffer (spu);
 
-    CommandCode commandCode = ReadData (CommandCode);
+    printf ("Reading command: \n");
+
+    CommandCode commandCode {};
+    ReadData (spu, &commandCode, CommandCode);
+
     const AssemblerInstruction *instruction = FindInstructionByNumber (commandCode.opcode);
 
     if (instruction == NULL){
         RETURN WRONG_INSTRUCTION;
     }
 
-    RETURN instruction->callbackFunction (&commandCode);
+    printf ("%s\n", instruction->instructionName);
+
+    RETURN instruction->callbackFunction (spu, &commandCode);
 }
+
+static bool CopyVariableValue (void *destination, void *source, size_t size) {
+    PushLog (4);
+
+    custom_assert (destination, pointer_is_null, false);
+    custom_assert (source,      pointer_is_null, false);
+
+    if (destination == source) {
+        RETURN true;
+    }
+
+    char *destinationPointer = (char *) destination;
+    char *sourcePointer = (char *) source;
+
+    for (size_t dataChunk = 0; dataChunk < size; dataChunk++) {
+        *(destinationPointer + dataChunk) = *(sourcePointer + dataChunk);
+    }
+
+    RETURN true;
+}
+
 
 // Processor instructions
 

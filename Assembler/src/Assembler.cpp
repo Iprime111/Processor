@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <sys/types.h>
 
-
 #include "Assembler.h"
 #include "CommonModules.h"
 #include "CustomAssert.h"
@@ -95,28 +94,32 @@ static ProcessorErrorCode WriteInstructionData (int outFileDescriptor, const Ass
     CommandCode commandCode {};
     commandCode.opcode = instruction->commandCode.opcode;
 
-    char registerChar  = 0;
+    int registerChar  = 0;
     int  readedSymbols = 0;
     elem_t immedArgument = 0;
 
     // TODO plus sign
+
+    TextLine argsLine {line->pointer + initialOffset, line->length - (size_t) initialOffset};
+    ssize_t offset = FindActualStringBegin (&argsLine) + initialOffset;
 
     switch (argumentsCount) {
         case 0:
             break;
 
         case 1:
-            if (sscanf (line->pointer + initialOffset, "%lld", &immedArgument) == 1){
+            if (sscanf (line->pointer + offset, "%lf", &immedArgument) == 1){
                 commandCode.hasImmedArgument = true;
 
-            } else if (sscanf (line->pointer + initialOffset, "r%cx%n", &registerChar, &readedSymbols) == 1 && readedSymbols == 3) {
-                if (registerChar >= 'a' && registerChar <= 'd') {
+            } else if (sscanf (line->pointer + offset, " r%cx%n", &registerChar, &readedSymbols) > 0 && readedSymbols == 3) {
+                if (registerChar < 'a' || registerChar > 'd') {
                     RETURN TOO_FEW_ARGUMENTS;
                 }
 
                 commandCode.hasRegisterArgument = true;
 
             }else {
+
                 RETURN TOO_FEW_ARGUMENTS;
             }
             break;
@@ -143,15 +146,15 @@ static ProcessorErrorCode WriteInstructionData (int outFileDescriptor, const Ass
     if (commandCode.hasRegisterArgument) {
         registerChar -= 'a';
 
-        WriteDataToBuffer (&registerChar, sizeof (char));
+        WriteDataToBuffer ((char *) &registerChar, sizeof (int));
 
-        printf ("r%cx (size = %lu) ", registerChar + 'a', sizeof (char));
+        printf ("r%cx (size = %lu) ", registerChar + 'a', sizeof (int));
     }
 
     if (commandCode.hasImmedArgument) {
         WriteDataToBuffer ((char *) &immedArgument, sizeof (elem_t));
 
-        printf ("%llu (size = %lu)", immedArgument, sizeof (elem_t));
+        printf ("%lf (size = %lu)", immedArgument, sizeof (elem_t));
     }
 
     #define INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)   \
@@ -202,11 +205,17 @@ static ssize_t CountWhitespaces (TextLine *line) {
             }                                                   \
             RETURN -1
 
-// TODO add comments functionality
 static ssize_t FindActualStringEnd (TextLine *line) {
     PushLog (3);
 
-    DetectWhitespacePosition (size_t charPointer = line->length; charPointer >= 0; charPointer--);
+    size_t length = line->length;
+
+    char *splitterPointer = strchr (line->pointer, ';');
+    if (splitterPointer) {
+        length = (size_t) (splitterPointer - line->pointer - 1);
+    }
+
+    DetectWhitespacePosition (size_t charPointer = length; charPointer >= 0; charPointer--);
 }
 
 static ssize_t FindActualStringBegin (TextLine *line) {
