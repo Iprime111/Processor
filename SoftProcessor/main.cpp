@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <stdio.h>
 #include <sys/stat.h>
 
@@ -11,12 +12,11 @@
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 
-const size_t MAX_BINARY_FILES = 1024;
-
-static char *BinaryFiles [MAX_BINARY_FILES] = {};
-static size_t BinaryCount = 0;
+static char *BinaryFile = NULL;
 
 void AddBinary (char **arguments);
+
+static bool PrepareForExecuting (FileBuffer *fileBuffer);
 
 int main (int argc, char **argv){
     PushLog (1);
@@ -25,49 +25,54 @@ int main (int argc, char **argv){
     register_flag ("-b", "--binary", AddBinary, 1);
     parse_flags (argc, argv);
 
-    //Read binary files
+    //Read binary file
     FileBuffer fileBuffer = {};
 
-    for (size_t fileIndex = 0; fileIndex < BinaryCount; fileIndex++) {
-        if (!CreateFileBuffer (&fileBuffer, BinaryFiles [fileIndex])) {
-
-            DestroyFileBuffer (&fileBuffer);
-            continue;
-        }
-
-        if (!ReadFile (BinaryFiles [fileIndex], &fileBuffer)) {
-
-            DestroyFileBuffer (&fileBuffer);
-            continue;
-        }
-
+    if (PrepareForExecuting (&fileBuffer)){
         SPU spu {
             .bytecode = &fileBuffer,
         };
 
         ExecuteFile (&spu);
-
-        DestroyFileBuffer (&fileBuffer);
     }
 
+    DestroyFileBuffer (&fileBuffer);
 
     RETURN 0;
+}
+
+static bool PrepareForExecuting (FileBuffer *fileBuffer) {
+    PushLog (2);
+
+    if (!BinaryFile) {
+        RETURN false;
+    }
+
+    if (!CreateFileBuffer (fileBuffer, BinaryFile)) {
+
+        RETURN false;
+    }
+
+    if (!ReadFile (BinaryFile, fileBuffer)) {
+
+        RETURN false;
+    }
+
+    RETURN true;
 }
 
 void AddBinary (char **arguments) {
     PushLog (3);
 
-    if (IsRegularFile (arguments [0]) != 1){
-        perror ("Error occuried while adding binary file");
+    custom_assert (arguments,     pointer_is_null, (void)0);
+    custom_assert (arguments [0], pointer_is_null, (void)0);
+
+    if (!IsRegularFile (arguments [0])){
 
         RETURN;
     }
 
-    custom_assert (BinaryCount < MAX_BINARY_FILES, invalid_value, (void)0);
-
-    if (BinaryCount < MAX_BINARY_FILES) {
-        BinaryFiles [BinaryCount++] = arguments [0];
-    }
+    BinaryFile = arguments [0];
 
     RETURN;
 }

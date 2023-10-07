@@ -1,7 +1,10 @@
 project (CommonModules)
 
-add_library (CommonModules src/CommonModules.cpp)
+add_library (CommonModules "")
 
+add_subdirectory (src)
+
+target_link_libraries (CommonModules PRIVATE ColorConsole)
 target_link_libraries (CommonModules PRIVATE CustomAssert)
 target_link_libraries (CommonModules PRIVATE FileIO)
 target_link_libraries (CommonModules PRIVATE Stack)

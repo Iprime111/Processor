@@ -36,6 +36,7 @@ ProcessorErrorCode AssembleFile (TextBuffer *file, int outFileDescriptor) {
     RETURN NO_PROCESSOR_ERRORS;
 }
 
+// TODO blank lines skip
 static ProcessorErrorCode CompileLine (TextLine *line, int outFileDescriptor) {
     PushLog (2);
     custom_assert (line,          pointer_is_null, NO_BUFFER);

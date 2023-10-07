@@ -11,67 +11,89 @@
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 
-const size_t MAX_BINARY_FILES = 1024;
+static char *BinaryFile = NULL;
+static char *OutFile    = "a.disasm";
 
-static char *BinaryFiles [MAX_BINARY_FILES] = {};
-static size_t BinaryCount = 0;
+void AddBinary  (char **arguments);
+void AddOutFile (char **arguments);
 
-void AddBinary (char **arguments);
+static bool PrepareForDisassembling (FileBuffer *fileBuffer, int *outFileDescriptor);
 
 int main (int argc, char **argv){
     PushLog (1);
 
     //Process console line arguments
     register_flag ("-b", "--binary", AddBinary, 1);
+    register_flag ("-o", "--output", AddOutFile, 1);
     parse_flags (argc, argv);
 
     //Read binary files
     FileBuffer fileBuffer = {};
+    int outFileDescriptor = -1;
 
-    for (size_t fileIndex = 0; fileIndex < BinaryCount; fileIndex++) {
-         bool shouldAssemble = true;
+    if (PrepareForDisassembling (&fileBuffer, &outFileDescriptor)) {
+        SPU spu {
+            .bytecode = &fileBuffer,
+        };
 
-        if (!CreateFileBuffer (&fileBuffer, BinaryFiles [fileIndex]))
-            shouldAssemble = false;
+        DisassembleFile (outFileDescriptor, &spu);
 
-        if (!ReadFile (BinaryFiles [fileIndex], &fileBuffer))
-            shouldAssemble = false;
-
-        int outFileDescriptor = -1;
-        if ((outFileDescriptor = OpenFileWrite ("test.disasm")) == -1)
-            shouldAssemble = false;
-
-        if (shouldAssemble) {
-            SPU spu {
-                .bytecode = &fileBuffer,
-            };
-
-            DisassembleFile (outFileDescriptor, &spu);
-
-            CloseFile (outFileDescriptor);
-        }
-
-        DestroyFileBuffer (&fileBuffer);
+        CloseFile (outFileDescriptor);
     }
+
+    DestroyFileBuffer (&fileBuffer);
 
 
     RETURN 0;
 }
 
+static bool PrepareForDisassembling (FileBuffer *fileBuffer, int *outFileDescriptor) {
+    PushLog (2);
+
+    if (!BinaryFile) {
+        RETURN false;
+    }
+
+    if (!CreateFileBuffer (fileBuffer, BinaryFile)) {
+        RETURN false;
+    }
+
+    if (!ReadFile (BinaryFile, fileBuffer)) {
+        RETURN false;
+    }
+
+    if ((*outFileDescriptor = OpenFileWrite (OutFile)) == -1) {
+        RETURN false;
+    }
+
+    RETURN true;
+}
+
 void AddBinary (char **arguments) {
     PushLog (3);
 
-    if (IsRegularFile (arguments [0]) != 1){
+    custom_assert (arguments,     pointer_is_null, (void)0);
+    custom_assert (arguments [0], pointer_is_null, (void)0);
+
+    if (!IsRegularFile (arguments [0])){
         perror ("Error occuried while adding binary file");
 
         RETURN;
     }
 
-    custom_assert (BinaryCount < MAX_BINARY_FILES, invalid_value, (void)0);
+    BinaryFile = arguments [0];
 
-    if (BinaryCount < MAX_BINARY_FILES) {
-        BinaryFiles [BinaryCount++] = arguments [0];
-    }
+    RETURN;
+}
+
+
+void AddOutFile (char **arguments) {
+    PushLog (3);
+
+    custom_assert (arguments,     pointer_is_null, (void)0);
+    custom_assert (arguments [0], pointer_is_null, (void)0);
+
+    OutFile = arguments [0];
 
     RETURN;
 }

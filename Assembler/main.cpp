@@ -1,54 +1,43 @@
+#include <bits/types/FILE.h>
+#include <cstdio>
 #include <stdlib.h>
 
 #include "ConsoleParser.h"
+#include "CustomAssert.h"
 #include "FileIO.h"
 #include "Logger.h"
 #include "TextTypes.h"
 #include "Assembler.h"
 
-const size_t MAX_SOURCE_FILES = 1024;
-
-static char *SourceFiles [MAX_SOURCE_FILES] = {};
-static size_t SourceCount = 0;
+static char *SourceFile = NULL;
+static char *BinaryFile = "a.out";
 
 void AddSource (char **arguments);
+void AddBinary (char **arguments);
+
+static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer, int *outFileDescriptor);
 
 int main (int argc, char **argv) {
     PushLog (1);
 
     //Process console line arguments
     register_flag ("-s", "--source", AddSource, 1);
+    register_flag ("-o", "--output", AddBinary, 1);
     parse_flags (argc, argv);
 
     //Process source files
     FileBuffer fileBuffer = {};
     TextBuffer textBuffer = {};
 
-    for (size_t fileIndex = 0; fileIndex < SourceCount; fileIndex++) {
-        bool shouldAssemble = true;
+    int outFileDescriptor = -1;
 
-        if (!CreateFileBuffer (&fileBuffer, SourceFiles [fileIndex]))
-            shouldAssemble = false;
-
-        if (!ReadFileLines (SourceFiles [fileIndex], &fileBuffer, &textBuffer))
-            shouldAssemble = false;
-
-        if (!ChangeNewLinesToZeroes (&textBuffer))
-            shouldAssemble = false;
-
-        int outFileDescriptor = -1;
-        if ((outFileDescriptor = OpenFileWrite ("test")) == -1)
-            shouldAssemble = false;
-
-        if (shouldAssemble) {
-            AssembleFile (&textBuffer, outFileDescriptor);
-
-            CloseFile (outFileDescriptor);
-        }
-
-        DestroyFileBuffer (&fileBuffer);
-        free (textBuffer.lines);
+    if (PrepareForAssembling (&fileBuffer, &textBuffer, &outFileDescriptor)) {
+        AssembleFile (&textBuffer, outFileDescriptor);
+        CloseFile (outFileDescriptor);
     }
+
+    DestroyFileBuffer (&fileBuffer);
+    free (textBuffer.lines);
 
     RETURN 0;
 }
@@ -56,18 +45,48 @@ int main (int argc, char **argv) {
 void AddSource (char **arguments) {
     PushLog (3);
 
-    if (IsRegularFile (arguments [0]) != 1){
-        perror ("Error occuried while adding source file file");
+    custom_assert (arguments,     pointer_is_null, (void)0);
+    custom_assert (arguments [0], pointer_is_null, (void)0);
 
-        RETURN;
+    if (IsRegularFile (arguments [0])) {
+        SourceFile = arguments [0];
     }
+}
 
-    custom_assert (SourceCount < MAX_SOURCE_FILES, invalid_value, (void)0);
+void AddBinary (char **arguments) {
+    PushLog (3);
 
-    if (SourceCount < MAX_SOURCE_FILES) {
-        SourceFiles [SourceCount++] = arguments [0];
-    }
+    custom_assert (arguments,     pointer_is_null, (void)0);
+    custom_assert (arguments [0], pointer_is_null, (void)0);
+
+    BinaryFile = arguments [0];
 
     RETURN;
+}
+
+static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer, int *outFileDescriptor) {
+    PushLog (2);
+
+    if (!SourceFile) {
+        RETURN false;
+    }
+
+    if (!CreateFileBuffer (fileBuffer, SourceFile)) {
+        RETURN false;
+    }
+
+    if (!ReadFileLines (SourceFile, fileBuffer, textBuffer)) {
+        RETURN false;
+    }
+
+    if (!ChangeNewLinesToZeroes (textBuffer)) {
+        RETURN false;
+    }
+
+    if ((*outFileDescriptor = OpenFileWrite (BinaryFile)) == -1) {
+        RETURN false;
+    }
+
+    RETURN true;
 }
 
