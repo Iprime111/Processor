@@ -21,6 +21,8 @@ enum ProcessorErrorCode {
     TOO_MANY_ARGUMENTS  = 1 << 6,
     TOO_FEW_ARGUMENTS   = 1 << 7,
     OUTPUT_FILE_ERROR   = 1 << 8,
+    INPUT_FILE_ERROR    = 1 << 9,
+    BLANK_LINE          = 1 << 10,
 };
 
 struct CommandCode {
@@ -62,7 +64,7 @@ bool CopyVariableValue (void *destination, void *source, size_t size);
         do {                                                                    \
             char *bufferPointer = (spu)->bytecode->buffer + (spu)->currentChar; \
             custom_assert (bufferPointer, pointer_is_null, NO_BUFFER);          \
-            if ((spu)->currentChar >= (spu)->bytecode->buffer_size) {           \
+            if ((ssize_t) (spu)->currentChar >= (spu)->bytecode->buffer_size) { \
                 RETURN BUFFER_ENDED;                                            \
             }                                                                   \
             CopyVariableValue (destination, bufferPointer, sizeof (type));      \

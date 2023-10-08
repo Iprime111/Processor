@@ -8,6 +8,7 @@
 #include "CustomAssert.h"
 #include "FileIO.h"
 #include "Logger.h"
+#include "MessageHandler.h"
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 
@@ -20,6 +21,7 @@ static ssize_t CountWhitespaces (TextLine *line);
 static ssize_t FindActualStringEnd (TextLine *line);
 static ssize_t FindActualStringBegin (TextLine *line);
 
+// TODO delete binary file if compilation was aborted
 ProcessorErrorCode AssembleFile (TextBuffer *file, int outFileDescriptor) {
     PushLog (1);
 
@@ -29,6 +31,7 @@ ProcessorErrorCode AssembleFile (TextBuffer *file, int outFileDescriptor) {
     for (size_t lineIndex = 0; lineIndex < file->line_count; lineIndex++) {
         ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
         if ((errorCode = CompileLine (file->lines + lineIndex, outFileDescriptor)) != NO_PROCESSOR_ERRORS) {
+            PrintErrorMessage (errorCode, "Compilation error", NULL);
             RETURN errorCode;
         }
     }
@@ -75,13 +78,18 @@ static ProcessorErrorCode GetInstructionConstantData (TextLine *line, const Asse
 
     int sscanfResult = sscanf (line->pointer, "%s%n", sscanfBuffer, offset);
 
-    if (sscanfResult <= 0 || sscanfResult == EOF) {
+    if (sscanfResult <= 0) {
+        RETURN BLANK_LINE;
+    }
+
+    if (sscanfResult == EOF) {
         RETURN NO_BUFFER;
     }
 
     *instruction = FindInstructionByName (sscanfBuffer);
 
     if (!*instruction) {
+        PrintErrorMessage (WRONG_INSTRUCTION, "Wrong instruction has been read", NULL);
         RETURN WRONG_INSTRUCTION;
     }
 
@@ -110,10 +118,16 @@ static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstructio
     switch (argumentsCount) {
         case 2:
             if (sscanf (line->pointer + offset, "%*s r%cx+%lf", registerIndex, immedArgument) > 0) {
+                if (*registerIndex < 'a' || *registerIndex > 'd') {
+                    PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong register name format", NULL);
+                    RETURN TOO_FEW_ARGUMENTS;
+                }
+
                 commandCode->hasImmedArgument = true;
                 commandCode->hasRegisterArgument = true;
                 *registerIndex -= 'a';
             }else {
+                PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong arguments format", NULL);
                 RETURN TOO_FEW_ARGUMENTS;
             }
             break;
@@ -127,18 +141,20 @@ static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstructio
 
             } else if (sscanf (line->pointer + offset, "%*s r%cx", registerIndex) > 0) {
                 if (*registerIndex < 'a' || *registerIndex > 'd') {
+                    PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong register name format", NULL);
                     RETURN TOO_FEW_ARGUMENTS;
                 }
 
                 *registerIndex -= 'a';
                 commandCode->hasRegisterArgument = true;
             }else {
-
+                PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong arguments format", NULL);
                 RETURN TOO_FEW_ARGUMENTS;
             }
             break;
 
         default:
+            PrintErrorMessage (TOO_MANY_ARGUMENTS, "Too manu arguments for this command", NULL);
             RETURN TOO_MANY_ARGUMENTS;
             break;
     }
@@ -150,17 +166,18 @@ static ProcessorErrorCode EmitInstruction (int outFileDescriptor, CommandCode *c
     PushLog (3);
     custom_assert (commandCode, pointer_is_null, WRONG_INSTRUCTION);
 
-    #define WriteDataToBuffer(data, size)                           \
-        do {                                                        \
-            if (!WriteBuffer (outFileDescriptor, data, size)) {     \
-                RETURN OUTPUT_FILE_ERROR;                           \
-            }                                                       \
+    #define WriteDataToBuffer(data, size)                                                                   \
+        do {                                                                                                \
+            if (!WriteBuffer (outFileDescriptor, data, size)) {                                             \
+                PrintErrorMessage (OUTPUT_FILE_ERROR, "Error occuried while writing to binary file", NULL); \
+                RETURN OUTPUT_FILE_ERROR;                                                                   \
+            }                                                                                               \
         } while (0)
 
     WriteDataToBuffer ((char *) commandCode, sizeof (char));
 
     if (commandCode->hasRegisterArgument) {
-        WriteDataToBuffer ((char *) &registerIndex, sizeof (char));
+        WriteDataToBuffer (&registerIndex, sizeof (char));
 
         printf ("r%cx (size = %lu) ", registerIndex + 'a', sizeof (char));
     }

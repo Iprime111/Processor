@@ -1,5 +1,6 @@
 #include <cstdio>
 
+#include "MessageHandler.h"
 #include "SoftProcessor.h"
 #include "ColorConsole.h"
 #include "CommonModules.h"
@@ -13,6 +14,7 @@
 #define PushValue(spu, value)                                                       \
             do {                                                                    \
                 if (StackPush_ (&((spu)->processorStack), value) != NO_ERRORS) {    \
+                    PrintErrorMessage (STACK_ERROR, "Stack error occuried", NULL);   \
                     RETURN STACK_ERROR;                                             \
                 }                                                                   \
             }while (0)
@@ -20,6 +22,7 @@
 #define PopValue(spu, value)                                                        \
             do {                                                                    \
                 if (StackPop_ (&((spu)->processorStack), value) != NO_ERRORS) {     \
+                    PrintErrorMessage (STACK_ERROR, "Stack error occuried", NULL);  \
                     RETURN STACK_ERROR;                                             \
                 }                                                                   \
             }while (0)
@@ -63,6 +66,7 @@ static ProcessorErrorCode ReadInstruction (SPU *spu) {
     const AssemblerInstruction *instruction = FindInstructionByNumber (commandCode.opcode);
 
     if (instruction == NULL){
+        PrintErrorMessage (WRONG_INSTRUCTION, "Wrong instruction readed", NULL);
         RETURN WRONG_INSTRUCTION;
     }
 

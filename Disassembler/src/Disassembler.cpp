@@ -7,6 +7,7 @@
 #include "CustomAssert.h"
 #include "FileIO.h"
 #include "Logger.h"
+#include "MessageHandler.h"
 #include "Stack/StackPrintf.h"
 #include "TextTypes.h"
 #include "Stack/Stack.h"
@@ -14,6 +15,7 @@
 
 static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu);
 
+// TODO delete disassembly file if process was aborted
 ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
     PushLog (1);
 
@@ -38,6 +40,7 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
     const AssemblerInstruction *instruction = FindInstructionByNumber (commandCode.opcode);
 
     if (!instruction){
+        PrintErrorMessage (WRONG_INSTRUCTION, "Wrong instruction readed", NULL);
         RETURN WRONG_INSTRUCTION;
     }
 
@@ -53,7 +56,12 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
         ReadData (spu, &registerIndex, char);
         ReadData (spu, &immedArgument, elem_t);
 
-        sprintf (commandLine, "%s r%cx+%lf\n", instruction->instructionName, registerIndex + 'a', immedArgument);
+        if (registerIndex >= 0 && registerIndex < REGISTER_COUNT){
+            sprintf (commandLine, "%s r%cx+%lf\n", instruction->instructionName, registerIndex + 'a', immedArgument);
+        }else {
+            PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong register name format", NULL);
+            RETURN TOO_FEW_ARGUMENTS;
+        }
     }else if (commandCode.hasImmedArgument) {
         ReadData (spu, &immedArgument, elem_t);
 
@@ -61,12 +69,19 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
     }else if (commandCode.hasRegisterArgument){
         ReadData (spu, &registerIndex, char);
 
-        sprintf (commandLine, "%s r%cx\n", instruction->instructionName, registerIndex + 'a');
+        if (registerIndex >= 0 && registerIndex < REGISTER_COUNT) {
+            sprintf (commandLine, "%s r%cx\n", instruction->instructionName, registerIndex + 'a');
+        }else {
+            PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong register name format", NULL);
+            RETURN TOO_FEW_ARGUMENTS;
+        }
+
     }else {
         sprintf (commandLine, "%s\n", instruction->instructionName);
     }
 
     if (!WriteBuffer (outFileDescriptor, commandLine, (ssize_t) strlen (commandLine))) {
+        PrintErrorMessage (OUTPUT_FILE_ERROR, "Error occuried while writing to the disassembly file", NULL);
         RETURN OUTPUT_FILE_ERROR;
     }
 

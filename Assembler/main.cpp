@@ -6,6 +6,8 @@
 #include "CustomAssert.h"
 #include "FileIO.h"
 #include "Logger.h"
+#include "MessageHandler.h"
+#include "SecureStack/SecureStack.h"
 #include "TextTypes.h"
 #include "Assembler.h"
 
@@ -19,6 +21,8 @@ static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer
 
 int main (int argc, char **argv) {
     PushLog (1);
+
+    SetGlobalMessagePrefix ("Assembler");
 
     //Process console line arguments
     register_flag ("-s", "--source", AddSource, 1);
@@ -72,18 +76,22 @@ static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer
     }
 
     if (!CreateFileBuffer (fileBuffer, SourceFile)) {
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while creating file buffer", NULL);
         RETURN false;
     }
 
     if (!ReadFileLines (SourceFile, fileBuffer, textBuffer)) {
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while reading file lines", NULL);
         RETURN false;
     }
 
     if (!ChangeNewLinesToZeroes (textBuffer)) {
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while changing new line symbols to zero symbols", NULL);
         RETURN false;
     }
 
     if ((*outFileDescriptor = OpenFileWrite (BinaryFile)) == -1) {
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while opening binary file", NULL);
         RETURN false;
     }
 

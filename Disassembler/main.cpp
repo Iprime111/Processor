@@ -7,6 +7,7 @@
 #include "ConsoleParser.h"
 #include "Logger.h"
 #include "Disassembler.h"
+#include "MessageHandler.h"
 #include "SPU.h"
 #include "TextTypes.h"
 #include "Stack/Stack.h"
@@ -21,6 +22,8 @@ static bool PrepareForDisassembling (FileBuffer *fileBuffer, int *outFileDescrip
 
 int main (int argc, char **argv){
     PushLog (1);
+
+    SetGlobalMessagePrefix ("Disassembler");
 
     //Process console line arguments
     register_flag ("-b", "--binary", AddBinary, 1);
@@ -51,18 +54,22 @@ static bool PrepareForDisassembling (FileBuffer *fileBuffer, int *outFileDescrip
     PushLog (2);
 
     if (!BinaryFile) {
+        PrintErrorMessage (INPUT_FILE_ERROR, "No binary has been specified", NULL);
         RETURN false;
     }
 
     if (!CreateFileBuffer (fileBuffer, BinaryFile)) {
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while creating binary file buffer", NULL);
         RETURN false;
     }
 
     if (!ReadFile (BinaryFile, fileBuffer)) {
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while reading binary", NULL);
         RETURN false;
     }
 
     if ((*outFileDescriptor = OpenFileWrite (OutFile)) == -1) {
+        PrintErrorMessage (OUTPUT_FILE_ERROR, "Error occuried while opening disassembly file", NULL);
         RETURN false;
     }
 
@@ -76,8 +83,7 @@ void AddBinary (char **arguments) {
     custom_assert (arguments [0], pointer_is_null, (void)0);
 
     if (!IsRegularFile (arguments [0])){
-        perror ("Error occuried while adding binary file");
-
+        PrintErrorMessage (TOO_FEW_ARGUMENTS, "Error occuried while adding binary file - not a regular file", NULL);
         RETURN;
     }
 
