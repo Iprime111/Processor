@@ -4,6 +4,7 @@
 #include "CustomAssert.h"
 #include "Logger.h"
 #include "SecureStack/SecureStack.h"
+
 #include <cstdio>
 
 static char *GlobalPrefix = NULL;

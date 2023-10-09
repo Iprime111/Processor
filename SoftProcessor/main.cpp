@@ -1,7 +1,3 @@
-#include <cstddef>
-#include <stdio.h>
-#include <sys/stat.h> // TODO
-
 #include "CommonModules.h"
 #include "CustomAssert.h"
 #include "FileIO.h"
@@ -12,6 +8,10 @@
 #include "SoftProcessor.h"
 #include "TextTypes.h"
 #include "Stack/Stack.h"
+
+#include <cstddef>
+#include <stdio.h>
+#include <sys/stat.h>
 
 static char *BinaryFile = NULL; // TODO parser -> stores flags -> get("...")
 

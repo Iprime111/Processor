@@ -1,6 +1,3 @@
-#include <cstdio>
-#include <cstring>
-
 #include "Disassembler.h"
 #include "ColorConsole.h"
 #include "CommonModules.h"
@@ -12,6 +9,9 @@
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 #include "SPU.h"
+
+#include <cstdio>
+#include <cstring>
 
 static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu);
 

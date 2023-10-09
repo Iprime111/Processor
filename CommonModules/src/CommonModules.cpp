@@ -1,7 +1,7 @@
-#include <string.h>
-
 #include "CustomAssert.h"
 #include "CommonModules.h"
+
+#include <string.h>
 
 #define INSTRUCTION(NAME, OPCODE, ...)              \
             {                                       \

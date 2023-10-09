@@ -1,10 +1,11 @@
 #ifndef COMMON_MODULES_H_
 #define COMMON_MODULES_H_
 
-#include <stddef.h>
 #include "CustomAssert.h"
 #include "Logger.h"
 #include "SPU.h"
+
+#include <stddef.h>
 
 const long long FIXED_FLOAT_PRECISION = 1e3;
 

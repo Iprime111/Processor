@@ -1,8 +1,3 @@
-#include <cstring>
-#include <ctype.h>
-#include <stdio.h>
-#include <sys/types.h>
-
 #include "Assembler.h"
 #include "CommonModules.h"
 #include "CustomAssert.h"
@@ -12,8 +7,13 @@
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 
+#include <string.h>
+#include <ctype.h>
+#include <stdio.h>
+#include <sys/types.h>
+
 static ProcessorErrorCode CompileLine (TextLine *line, int outFileDescriptor);
-static ProcessorErrorCode GetInstructionConstantData (TextLine *line, const AssemblerInstruction **instruction, int *offset);
+static ProcessorErrorCode GetInstructionOpcode (TextLine *line, const AssemblerInstruction **instruction, int *offset);
 static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstruction *instruction, TextLine *line, CommandCode *commandCode, char *registerIndex, elem_t *immedArgument);
 static ProcessorErrorCode EmitInstruction (int outFileDescriptor, CommandCode *commandCode, char registerIndex, elem_t immedArgument);
 
@@ -29,8 +29,9 @@ ProcessorErrorCode AssembleFile (TextBuffer *file, int outFileDescriptor) {
     custom_assert (file->lines, pointer_is_null, NO_BUFFER);
 
     for (size_t lineIndex = 0; lineIndex < file->line_count; lineIndex++) {
-        ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
-        if ((errorCode = CompileLine (file->lines + lineIndex, outFileDescriptor)) != NO_PROCESSOR_ERRORS) {
+        ProcessorErrorCode errorCode = CompileLine (file->lines + lineIndex, outFileDescriptor);
+
+        if (!(errorCode & (BLANK_LINE)) && errorCode != NO_PROCESSOR_ERRORS) {
             PrintErrorMessage (errorCode, "Compilation error", NULL);
             RETURN errorCode;
         }
@@ -39,11 +40,14 @@ ProcessorErrorCode AssembleFile (TextBuffer *file, int outFileDescriptor) {
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-// TODO blank lines skip
 static ProcessorErrorCode CompileLine (TextLine *line, int outFileDescriptor) {
     PushLog (2);
     custom_assert (line,          pointer_is_null, NO_BUFFER);
     custom_assert (line->pointer, pointer_is_null, NO_BUFFER);
+
+    if (FindActualStringBegin (line) < 0) {
+        RETURN BLANK_LINE;
+    }
 
     ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
 
@@ -51,8 +55,7 @@ static ProcessorErrorCode CompileLine (TextLine *line, int outFileDescriptor) {
     const AssemblerInstruction *instruction = NULL;
     int argumentsOffset = 0;
 
-    // TODO get instr opcode
-    if ((errorCode = GetInstructionConstantData (line, &instruction, &argumentsOffset)) != NO_PROCESSOR_ERRORS) {
+    if ((errorCode = GetInstructionOpcode (line, &instruction, &argumentsOffset)) != NO_PROCESSOR_ERRORS) {
         RETURN errorCode;
     }
 
@@ -69,7 +72,7 @@ static ProcessorErrorCode CompileLine (TextLine *line, int outFileDescriptor) {
     RETURN EmitInstruction (outFileDescriptor, &commandCode, registerIndex, immedArgument);
 }
 
-static ProcessorErrorCode GetInstructionConstantData (TextLine *line, const AssemblerInstruction **instruction, int *offset) {
+static ProcessorErrorCode GetInstructionOpcode (TextLine *line, const AssemblerInstruction **instruction, int *offset) {
     PushLog (3);
 
     custom_assert (instruction, pointer_is_null, WRONG_INSTRUCTION);

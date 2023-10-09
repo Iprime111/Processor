@@ -1,5 +1,3 @@
-#include <cstdio>
-
 #include "MessageHandler.h"
 #include "SoftProcessor.h"
 #include "ColorConsole.h"
@@ -10,6 +8,8 @@
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 #include "SPU.h"
+
+#include <cstdio>
 
 #define PushValue(spu, value)                                                       \
             do {                                                                    \
