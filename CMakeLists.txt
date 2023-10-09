@@ -19,4 +19,14 @@ add_subdirectory (SoftProcessor)
 add_subdirectory (Assembler)
 add_subdirectory (Disassembler)
 
+set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+set_target_properties (Assembler Disassembler SoftProcessor CommonModules FileIO CustomAssert Stack ConsoleParser ColorConsole
+                       PROPERTIES
+                       ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+                       LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+                       RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
 

@@ -41,7 +41,7 @@ static ProcessorErrorCode ReadInstruction (SPU *spu);
 ProcessorErrorCode ExecuteFile (SPU *spu) {
     PushLog (1);
 
-    spu->currentChar = 0;
+    spu->ip = 0;
     CheckBuffer (spu);
 
     StackInitDefault_ (&spu->processorStack);
@@ -58,19 +58,19 @@ static ProcessorErrorCode ReadInstruction (SPU *spu) {
 
     CheckBuffer (spu);
 
-    printf ("Reading command: "); // #ifndef _NDEBUG / log.txt / stderr
+    ON_DEBUG (printf ("Reading command: "));
 
-    CommandCode commandCode {}; //TODO default values
-    ReadData (spu, &commandCode, char);
+    CommandCode commandCode {0, 0};
+    ReadData (spu, &commandCode, CommandCode);
 
-    const AssemblerInstruction *instruction = FindInstructionByNumber (commandCode.opcode); // TODO by opcode
+    const AssemblerInstruction *instruction = FindInstructionByOpcode (commandCode.opcode);
 
     if (instruction == NULL){
         PrintErrorMessage (WRONG_INSTRUCTION, "Wrong instruction readed", NULL);
         RETURN WRONG_INSTRUCTION;
     }
 
-    printf ("%s\n", instruction->instructionName);
+    ON_DEBUG (printf ("%s\n", instruction->instructionName));
 
     RETURN instruction->callbackFunction (spu, &commandCode);
 }

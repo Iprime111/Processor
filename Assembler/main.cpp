@@ -1,6 +1,6 @@
 #include <bits/types/FILE.h>
 #include <cstdio>
-#include <stdlib.h>
+#include <stdlib.h>// TODO
 
 #include "ConsoleParser.h"
 #include "CustomAssert.h"
@@ -12,13 +12,14 @@
 #include "Assembler.h"
 
 static char *SourceFile = NULL;
-static char *BinaryFile = "a.out";
+static char *BinaryFile = "a.out"; // TODO think 'bout it
 
 void AddSource (char **arguments);
 void AddBinary (char **arguments);
 
 static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer, int *outFileDescriptor);
 
+// TODO create the best listing
 int main (int argc, char **argv) {
     PushLog (1);
 
@@ -28,6 +29,8 @@ int main (int argc, char **argv) {
     register_flag ("-s", "--source", AddSource, 1);
     register_flag ("-o", "--output", AddBinary, 1);
     parse_flags (argc, argv);
+    // TODO parser -> stores flags -> get("...")
+    // TODO: get_flag(parser, "binary")
 
     //Process source files
     FileBuffer fileBuffer = {};

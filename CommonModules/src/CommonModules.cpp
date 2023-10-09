@@ -6,7 +6,7 @@
 #define INSTRUCTION(NAME, OPCODE, ...)              \
             {                                       \
                 .instructionName = #NAME,           \
-                .commandCode = {OPCODE, 0, 0},      \
+                .commandCode = {OPCODE, 0},         \
                 .callbackFunction = NAME##Callback, \
             },
 
@@ -16,11 +16,11 @@ static const struct AssemblerInstruction AvailableInstructions [] = {
 #undef INSTRUCTION
 
 #define  FindInstruction(predicate)                                                                                                                         \
-            do {         t instructionIndex = 0; instructionIndex < sizeof (AvailableInstructions) / sizeof (AssemblerInstruction); instructionIndex++) {  \
+            do {                                                                                                                                            \
+                for (size_t instructionIndex = 0; instructionIndex < sizeof (AvailableInstructions) / sizeof (AssemblerInstruction); instructionIndex++) {  \
                     if (predicate) {                                                                                                                        \
                         RETURN AvailableInstructions + instructionIndex;                                                                                    \
                     }                                                                                                                                       \
-                for (size_                                                                                                                                   \
                 }                                                                                                                                           \
                 RETURN NULL;                                                                                                                                \
             }while (0)                                                                                                                                      \
@@ -32,7 +32,7 @@ const AssemblerInstruction *FindInstructionByName (char *name) {
     FindInstruction (strcmp (AvailableInstructions [instructionIndex].instructionName, name) == 0);
 }
 
-const AssemblerInstruction *FindInstructionByNumber (int instruction) {
+const AssemblerInstruction *FindInstructionByOpcode (int instruction) {
     PushLog (4);
 
     FindInstruction ((int) AvailableInstructions [instructionIndex].commandCode.opcode == instruction);

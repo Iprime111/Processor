@@ -25,10 +25,14 @@ enum ProcessorErrorCode {
     BLANK_LINE          = 1 << 10,
 };
 
+enum ArgumentsType {
+    IMMED_ARGUMENT    = 1 << 0,
+    REGISTER_ARGUMENT = 1 << 1,
+};
+
 struct CommandCode {
-    int opcode              : 4; // TODO char
-    int hasImmedArgument    : 1;
-    int hasRegisterArgument : 1;
+    char opcode    : 4;
+    char arguments : 4;
 };
 
 typedef ProcessorErrorCode (*callbackFunction_t)(SPU *spu, CommandCode *commandCode);
@@ -50,7 +54,7 @@ struct AssemblerInstruction {
 #undef INSTRUCTION
 
 const AssemblerInstruction *FindInstructionByName   (char *name);
-const AssemblerInstruction *FindInstructionByNumber (int instruction);
+const AssemblerInstruction *FindInstructionByOpcode (int instruction);
 bool CopyVariableValue (void *destination, void *source, size_t size);
 
 #define CheckBuffer(spu)                                                                            \
@@ -62,15 +66,20 @@ bool CopyVariableValue (void *destination, void *source, size_t size);
 
 #define ReadData(spu, destination, type)                                        \
         do {                                                                    \
-            char *bufferPointer = (spu)->bytecode->buffer + (spu)->currentChar; \
+            char *bufferPointer = (spu)->bytecode->buffer + (spu)->ip;          \
             custom_assert (bufferPointer, pointer_is_null, NO_BUFFER);          \
-            if ((ssize_t) (spu)->currentChar >= (spu)->bytecode->buffer_size) { \
+            if ((ssize_t) (spu)->ip >= (spu)->bytecode->buffer_size) {          \
                 RETURN BUFFER_ENDED;                                            \
             }                                                                   \
             CopyVariableValue (destination, bufferPointer, sizeof (type));      \
-            (spu)->currentChar += sizeof (type);                                \
+            (spu)->ip += sizeof (type);                                         \
         }while (0)
 
 
+#ifndef _NDEBUG
+    #define ON_DEBUG(...) __VA_ARGS__
+#else
+    #define ON_DEBUG(...)
+#endif
 
 #endif

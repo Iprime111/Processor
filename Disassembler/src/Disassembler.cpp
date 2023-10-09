@@ -19,7 +19,7 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu);
 ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
     PushLog (1);
 
-    spu->currentChar = 0;
+    spu->ip = 0;
     CheckBuffer (spu);
 
     while (ReadInstruction(outFileDescriptor, spu) == NO_PROCESSOR_ERRORS);
@@ -32,19 +32,19 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
 
     CheckBuffer (spu);
 
-    printf ("Reading command: ");
+    ON_DEBUG (printf ("Reading command: "));
 
-    CommandCode commandCode {};
-    ReadData (spu, &commandCode, char);
+    CommandCode commandCode {0, 0};
+    ReadData (spu, &commandCode, CommandCode);
 
-    const AssemblerInstruction *instruction = FindInstructionByNumber (commandCode.opcode);
+    const AssemblerInstruction *instruction = FindInstructionByOpcode (commandCode.opcode);
 
     if (!instruction){
         PrintErrorMessage (WRONG_INSTRUCTION, "Wrong instruction readed", NULL);
         RETURN WRONG_INSTRUCTION;
     }
 
-    printf ("%s\n", instruction->instructionName);
+    ON_DEBUG (printf ("%s\n", instruction->instructionName));
 
     char commandLine [MAX_INSTRUCTION_LENGTH] = "";
     strcat (commandLine, instruction->instructionName);
@@ -52,7 +52,7 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
     char registerIndex = -1;
     elem_t immedArgument = 0;
 
-    if (commandCode.hasImmedArgument && commandCode.hasRegisterArgument) {
+    if (commandCode.arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT)) {
         ReadData (spu, &registerIndex, char);
         ReadData (spu, &immedArgument, elem_t);
 
@@ -62,11 +62,11 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
             PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong register name format", NULL);
             RETURN TOO_FEW_ARGUMENTS;
         }
-    }else if (commandCode.hasImmedArgument) {
+    }else if (commandCode.arguments & IMMED_ARGUMENT) {
         ReadData (spu, &immedArgument, elem_t);
 
         sprintf (commandLine, "%s %lf\n", instruction->instructionName, immedArgument);
-    }else if (commandCode.hasRegisterArgument){
+    }else if (commandCode.arguments & REGISTER_ARGUMENT){
         ReadData (spu, &registerIndex, char);
 
         if (registerIndex >= 0 && registerIndex < REGISTER_COUNT) {
