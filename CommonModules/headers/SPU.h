@@ -9,7 +9,7 @@ const char REGISTER_COUNT = 4;
 
 struct SPU {
     FileBuffer *bytecode;
-    size_t currentChar = 0;
+    size_t currentChar = 0; // TODO ip
     Stack processorStack = {};
     elem_t registerValues [REGISTER_COUNT] = {0, 0, 0, 0};
 };

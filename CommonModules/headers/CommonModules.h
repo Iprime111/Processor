@@ -26,7 +26,7 @@ enum ProcessorErrorCode {
 };
 
 struct CommandCode {
-    int opcode              : 4;
+    int opcode              : 4; // TODO char
     int hasImmedArgument    : 1;
     int hasRegisterArgument : 1;
 };

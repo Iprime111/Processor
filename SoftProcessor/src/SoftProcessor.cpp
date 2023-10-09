@@ -58,12 +58,12 @@ static ProcessorErrorCode ReadInstruction (SPU *spu) {
 
     CheckBuffer (spu);
 
-    printf ("Reading command: ");
+    printf ("Reading command: "); // #ifndef _NDEBUG / log.txt / stderr
 
-    CommandCode commandCode {};
+    CommandCode commandCode {}; //TODO default values
     ReadData (spu, &commandCode, char);
 
-    const AssemblerInstruction *instruction = FindInstructionByNumber (commandCode.opcode);
+    const AssemblerInstruction *instruction = FindInstructionByNumber (commandCode.opcode); // TODO by opcode
 
     if (instruction == NULL){
         PrintErrorMessage (WRONG_INSTRUCTION, "Wrong instruction readed", NULL);

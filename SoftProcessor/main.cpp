@@ -1,6 +1,6 @@
 #include <cstddef>
 #include <stdio.h>
-#include <sys/stat.h>
+#include <sys/stat.h> // TODO
 
 #include "CommonModules.h"
 #include "CustomAssert.h"
@@ -13,7 +13,7 @@
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 
-static char *BinaryFile = NULL;
+static char *BinaryFile = NULL; // TODO parser -> stores flags -> get("...")
 
 void AddBinary (char **arguments);
 
@@ -26,12 +26,14 @@ int main (int argc, char **argv){
     register_flag ("-b", "--binary", AddBinary, 1);
     parse_flags (argc, argv);
 
+    // TODO: get_flag(parser, "binary")
+
     //Read binary file
     FileBuffer fileBuffer = {};
 
     if (PrepareForExecuting (&fileBuffer)){
         SPU spu {
-            .bytecode = &fileBuffer,
+            .bytecode = &fileBuffer, // TODO ctor
         };
 
         ExecuteFile (&spu);

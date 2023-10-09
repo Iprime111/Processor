@@ -16,11 +16,11 @@ static const struct AssemblerInstruction AvailableInstructions [] = {
 #undef INSTRUCTION
 
 #define  FindInstruction(predicate)                                                                                                                         \
-            do {                                                                                                                                            \
-                for (size_t instructionIndex = 0; instructionIndex < sizeof (AvailableInstructions) / sizeof (AssemblerInstruction); instructionIndex++) {  \
+            do {         t instructionIndex = 0; instructionIndex < sizeof (AvailableInstructions) / sizeof (AssemblerInstruction); instructionIndex++) {  \
                     if (predicate) {                                                                                                                        \
                         RETURN AvailableInstructions + instructionIndex;                                                                                    \
                     }                                                                                                                                       \
+                for (size_                                                                                                                                   \
                 }                                                                                                                                           \
                 RETURN NULL;                                                                                                                                \
             }while (0)                                                                                                                                      \
