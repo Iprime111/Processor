@@ -5,13 +5,25 @@
 #include "Stack/Stack.h"
 
 // TODO CheckRegisterIndex(char registerIndex) function
-const char REGISTER_COUNT = 4;
+
+#define REGISTER(...) 1+
+const char REGISTER_COUNT =
+#include "Registers.def"
+0;
+
+#undef REGISTER
+
+#define REGISTER(...) 0,
 
 struct SPU {
     FileBuffer *bytecode;
     size_t ip = 0;
     Stack processorStack = {};
-    elem_t registerValues [REGISTER_COUNT] = {0, 0, 0, 0};
+    elem_t registerValues [REGISTER_COUNT] = {
+        #include "Registers.def"
+    };
 };
+
+#undef REGISTER
 
 #endif

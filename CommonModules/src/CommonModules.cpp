@@ -3,10 +3,10 @@
 
 #include <string.h>
 
-#define INSTRUCTION(NAME, OPCODE, ...)              \
+#define INSTRUCTION(NAME, COMMAND_CODE, ...)        \
             {                                       \
                 .instructionName = #NAME,           \
-                .commandCode = {OPCODE, 0},         \
+                .commandCode = COMMAND_CODE,        \
                 .callbackFunction = NAME##Callback, \
             },
 

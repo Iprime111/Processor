@@ -27,7 +27,7 @@
                 }                                                                   \
             }while (0)
 
-#define INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)                       \
+#define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)                 \
             INSTRUCTION_CALLBACK_FUNCTION (NAME) {                                              \
                 PushLog (3);                                                                    \
                 do                                                                              \
@@ -41,7 +41,6 @@ static ProcessorErrorCode ReadInstruction (SPU *spu);
 ProcessorErrorCode ExecuteFile (SPU *spu) {
     PushLog (1);
 
-    spu->ip = 0;
     CheckBuffer (spu);
 
     StackInitDefault_ (&spu->processorStack);

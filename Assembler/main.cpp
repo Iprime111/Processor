@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <stdlib.h>
 
+#include "CommonModules.h"
 #include "ConsoleParser.h"
 #include "CustomAssert.h"
 #include "FileIO.h"
@@ -39,8 +40,14 @@ int main (int argc, char **argv) {
     int outFileDescriptor = -1;
 
     if (PrepareForAssembling (&fileBuffer, &textBuffer, &outFileDescriptor)) {
-        AssembleFile (&textBuffer, outFileDescriptor);
+        ProcessorErrorCode errorCode = AssembleFile (&textBuffer, outFileDescriptor);
         CloseFile (outFileDescriptor);
+
+        if (errorCode != NO_PROCESSOR_ERRORS) {
+            if (remove (BinaryFile)) {
+                PrintErrorMessage (OUTPUT_FILE_ERROR, "Unable to delete corrupted binary file", NULL);
+            }
+        }
     }
 
     DestroyFileBuffer (&fileBuffer);

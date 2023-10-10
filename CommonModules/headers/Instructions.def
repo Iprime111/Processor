@@ -1,10 +1,12 @@
-//INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)
+//INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)
 
-INSTRUCTION (hlt, 0, {
+#define COMMA ,
+
+INSTRUCTION (hlt, {0 COMMA 0}, {
     RETURN PROCESSOR_HALT;
 }, {})
 
-INSTRUCTION (out, 1, {
+INSTRUCTION (out, {1 COMMA 0}, {
     elem_t value {};
     PopValue(spu, &value);
 
@@ -12,7 +14,7 @@ INSTRUCTION (out, 1, {
     fputs ("\n", stdout);
 }, {})
 
-INSTRUCTION (in, 2, {
+INSTRUCTION (in, {2 COMMA 0}, {
     elem_t value {};
 
     printf_color (CONSOLE_WHITE, CONSOLE_BOLD, "Enter value: ");
@@ -22,7 +24,7 @@ INSTRUCTION (in, 2, {
 
 }, {})
 
-INSTRUCTION (push, 3, {
+INSTRUCTION (push, {3 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT}, {
     CheckBuffer (spu);
 
     elem_t value = 0;
@@ -47,7 +49,7 @@ INSTRUCTION (push, 3, {
     PushValue (spu, value);
 }, {})
 
-INSTRUCTION (pop, 4, {
+INSTRUCTION (pop, {4 COMMA REGISTER_ARGUMENT}, {
     if (commandCode->arguments & REGISTER_ARGUMENT){
         unsigned char registerIndex = REGISTER_COUNT;
         ReadData (spu, &registerIndex, char);
@@ -58,7 +60,7 @@ INSTRUCTION (pop, 4, {
     }
 }, {})
 
-INSTRUCTION (add, 5, {
+INSTRUCTION (add, {5 COMMA 0}, {
     elem_t value1 {};
     elem_t value2 {};
 
@@ -68,7 +70,7 @@ INSTRUCTION (add, 5, {
     PushValue (spu, value1 + value2);
 }, {})
 
-INSTRUCTION (sub, 6, {
+INSTRUCTION (sub, {6 COMMA 0}, {
     elem_t value1 {};
     elem_t value2 {};
 
@@ -78,7 +80,7 @@ INSTRUCTION (sub, 6, {
     PushValue (spu, value2 - value1);
 }, {})
 
-INSTRUCTION (mul, 7, {
+INSTRUCTION (mul, {7 COMMA 0}, {
     elem_t value1 {};
     elem_t value2 {};
 
@@ -88,7 +90,7 @@ INSTRUCTION (mul, 7, {
     PushValue (spu, value1 * value2);
 }, {})
 
-INSTRUCTION (div, 8, {
+INSTRUCTION (div, {8 COMMA 0}, {
     elem_t value1 {};
     elem_t value2 {};
 
@@ -98,7 +100,7 @@ INSTRUCTION (div, 8, {
     PushValue (spu, value2 / value1);
 }, {})
 
-INSTRUCTION (sin, 9, {
+INSTRUCTION (sin, {9 COMMA 0}, {
     elem_t value {};
 
     PopValue (spu, &value);
@@ -106,7 +108,7 @@ INSTRUCTION (sin, 9, {
     PushValue (spu, sin (value));
 }, {})
 
-INSTRUCTION (cos, 10, {
+INSTRUCTION (cos, {10 COMMA 0}, {
     elem_t value {};
 
     PopValue (spu, &value);
@@ -114,10 +116,12 @@ INSTRUCTION (cos, 10, {
     PushValue (spu, cos (value));
 }, {})
 
-INSTRUCTION (sqrt, 11, {
+INSTRUCTION (sqrt, {11 COMMA 0}, {
     elem_t value {};
 
     PopValue (spu, &value);
 
     PushValue (spu, sqrt (value));
 }, {})
+
+#undef COMMA

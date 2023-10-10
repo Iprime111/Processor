@@ -15,7 +15,6 @@
 
 static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu);
 
-// TODO delete disassembly file if process was aborted
 ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
     PushLog (1);
 
@@ -51,17 +50,26 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
 
     char registerIndex = -1;
     elem_t immedArgument = 0;
+    char *registerName = NULL;
+
+    #define REGISTER(NAME, INDEX)               \
+                if (registerIndex == INDEX) {   \
+                    registerName = #NAME;       \
+                }
 
     if (commandCode.arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT)) {
         ReadData (spu, &registerIndex, char);
         ReadData (spu, &immedArgument, elem_t);
 
-        if (registerIndex >= 0 && registerIndex < REGISTER_COUNT){
-            sprintf (commandLine, "%s r%cx+%lf\n", instruction->instructionName, registerIndex + 'a', immedArgument);
-        }else {
+        #include "Registers.def"
+
+        if (!registerName) {
             PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong register name format", NULL);
             RETURN TOO_FEW_ARGUMENTS;
         }
+
+        sprintf (commandLine, "%s %s+%lf\n", instruction->instructionName, registerName, immedArgument);
+
     }else if (commandCode.arguments & IMMED_ARGUMENT) {
         ReadData (spu, &immedArgument, elem_t);
 
@@ -69,16 +77,20 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
     }else if (commandCode.arguments & REGISTER_ARGUMENT){
         ReadData (spu, &registerIndex, char);
 
-        if (registerIndex >= 0 && registerIndex < REGISTER_COUNT) {
-            sprintf (commandLine, "%s r%cx\n", instruction->instructionName, registerIndex + 'a');
-        }else {
+        #include "Registers.def"
+
+        if (!registerName) {
             PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong register name format", NULL);
             RETURN TOO_FEW_ARGUMENTS;
         }
 
+        sprintf (commandLine, "%s %s\n", instruction->instructionName, registerName);
+
     }else {
         sprintf (commandLine, "%s\n", instruction->instructionName);
     }
+
+    #undef REGISTER
 
     if (!WriteBuffer (outFileDescriptor, commandLine, (ssize_t) strlen (commandLine))) {
         PrintErrorMessage (OUTPUT_FILE_ERROR, "Error occuried while writing to the disassembly file", NULL);
@@ -89,9 +101,9 @@ static ProcessorErrorCode ReadInstruction (int outFileDescriptor, SPU *spu) {
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-#define INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)                       \
-            INSTRUCTION_CALLBACK_FUNCTION (NAME) {                                              \
-                return NO_PROCESSOR_ERRORS;                                                     \
+#define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK) \
+            INSTRUCTION_CALLBACK_FUNCTION (NAME) {                              \
+                return NO_PROCESSOR_ERRORS;                                     \
             }
 
 #include "Instructions.def"

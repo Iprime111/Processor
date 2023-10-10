@@ -21,7 +21,6 @@ static ssize_t CountWhitespaces (TextLine *line);
 static ssize_t FindActualStringEnd (TextLine *line);
 static ssize_t FindActualStringBegin (TextLine *line);
 
-// TODO delete binary file if compilation was aborted
 ProcessorErrorCode AssembleFile (TextBuffer *file, int outFileDescriptor) {
     PushLog (1);
 
@@ -33,6 +32,8 @@ ProcessorErrorCode AssembleFile (TextBuffer *file, int outFileDescriptor) {
 
         if (!(errorCode & (BLANK_LINE)) && errorCode != NO_PROCESSOR_ERRORS) {
             PrintErrorMessage (errorCode, "Compilation error", NULL);
+
+
             RETURN errorCode;
         }
     }
@@ -119,16 +120,28 @@ static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstructio
     TextLine argsLine {line->pointer, line->length };
     ssize_t offset = FindActualStringBegin (&argsLine);
 
-    switch (argumentsCount) {
-        case 2:
-            if (sscanf (line->pointer + offset, "%*s r%cx+%lf", registerIndex, immedArgument) > 0) {
-                if (*registerIndex < 'a' || *registerIndex > 'd') {// TODO check register
-                    PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong register name format", NULL);
-                    RETURN TOO_FEW_ARGUMENTS;
+    char registerNameBuffer [MAX_INSTRUCTION_LENGTH] = "";
+
+    #define REGISTER(NAME, INDEX)                           \
+                if (!strcmp (#NAME, registerNameBuffer)) {  \
+                    *registerIndex = INDEX;                 \
+                    break;                                  \
                 }
 
+    switch (argumentsCount) {
+        case 2:
+            if (instruction->commandCode.arguments != (REGISTER_ARGUMENT | IMMED_ARGUMENT)) {
+                PrintErrorMessage (WRONG_INSTRUCTION, "Instruction do not takes this set of arguments", NULL);
+                RETURN WRONG_INSTRUCTION;
+            }
+
+            if (sscanf (line->pointer + offset, "%*s %3s+%lf", registerNameBuffer, immedArgument) > 0) {
                 commandCode->arguments = IMMED_ARGUMENT | REGISTER_ARGUMENT;
-                *registerIndex -= 'a';
+
+                #include "Registers.def"
+
+                PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong register name format", NULL);
+                RETURN TOO_FEW_ARGUMENTS;
             }else {
                 PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong arguments format", NULL);
                 RETURN TOO_FEW_ARGUMENTS;
@@ -140,16 +153,25 @@ static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstructio
 
         case 1:
             if (sscanf (line->pointer + offset, "%*s %lf", immedArgument) > 0){
-                commandCode->arguments = IMMED_ARGUMENT;
-
-            } else if (sscanf (line->pointer + offset, "%*s r%cx", registerIndex) > 0) {
-                if (*registerIndex < 'a' || *registerIndex > 'd') {
-                    PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong register name format", NULL);
-                    RETURN TOO_FEW_ARGUMENTS;
+                if (!(instruction->commandCode.arguments & IMMED_ARGUMENT)) {
+                    PrintErrorMessage (WRONG_INSTRUCTION, "Instruction do not takes this set of arguments", NULL);
+                    RETURN WRONG_INSTRUCTION;
                 }
 
-                *registerIndex -= 'a';
+                commandCode->arguments = IMMED_ARGUMENT;
+
+            } else if (sscanf (line->pointer + offset, "%*s %s", registerNameBuffer) > 0) {
+                if (!(instruction->commandCode.arguments & REGISTER_ARGUMENT)) {
+                    PrintErrorMessage (WRONG_INSTRUCTION, "Instruction do not takes this set of arguments", NULL);
+                    RETURN WRONG_INSTRUCTION;
+                }
+
                 commandCode->arguments = REGISTER_ARGUMENT;
+
+                #include "Registers.def"
+
+                PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong register name format", NULL);
+                RETURN TOO_FEW_ARGUMENTS;
             }else {
                 PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong arguments format", NULL);
                 RETURN TOO_FEW_ARGUMENTS;
@@ -161,6 +183,8 @@ static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstructio
             RETURN TOO_MANY_ARGUMENTS;
             break;
     }
+
+    #undef REGISTER
 
     RETURN NO_PROCESSOR_ERRORS;
 }
@@ -179,8 +203,6 @@ static ProcessorErrorCode EmitInstruction (int outFileDescriptor, CommandCode *c
 
     WriteDataToBuffer ((char *) commandCode, sizeof (CommandCode));
 
-    // TODO register dsl
-
     if (commandCode->arguments & REGISTER_ARGUMENT) {
         WriteDataToBuffer (&registerIndex, sizeof (char));
 
@@ -193,9 +215,9 @@ static ProcessorErrorCode EmitInstruction (int outFileDescriptor, CommandCode *c
         ON_DEBUG (printf ("%lf (size = %lu)", immedArgument, sizeof (elem_t)));
     }
 
-    #define INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)   \
-                if (commandCode->opcode == OPCODE)                              \
-                    ASSEMBLER_CALLBACK                                          \
+    #define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK) \
+                if (commandCode->opcode == ((CommandCode) COMMAND_CODE).opcode)     \
+                    ASSEMBLER_CALLBACK                                              \
 
 
     #include "Instructions.def"

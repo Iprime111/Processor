@@ -41,9 +41,14 @@ int main (int argc, char **argv){
             .bytecode = &fileBuffer,
         };
 
-        DisassembleFile (outFileDescriptor, &spu);
-
+        ProcessorErrorCode errorCode = DisassembleFile (outFileDescriptor, &spu);
         CloseFile (outFileDescriptor);
+
+        if (errorCode != NO_PROCESSOR_ERRORS) {
+            if (remove (OutFile)) {
+                PrintErrorMessage (OUTPUT_FILE_ERROR, "Unable to delete corrupted disassembly file", NULL);
+            }
+        }
     }
 
     DestroyFileBuffer (&fileBuffer);
