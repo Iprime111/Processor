@@ -40,7 +40,7 @@ int main (int argc, char **argv) {
     int outFileDescriptor = -1;
 
     if (PrepareForAssembling (&fileBuffer, &textBuffer, &outFileDescriptor)) {
-        ProcessorErrorCode errorCode = AssembleFile (&textBuffer, outFileDescriptor);
+        ProcessorErrorCode errorCode = AssembleFile (&textBuffer, &fileBuffer, outFileDescriptor);
         CloseFile (outFileDescriptor);
 
         if (errorCode != NO_PROCESSOR_ERRORS) {

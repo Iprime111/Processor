@@ -5,7 +5,7 @@
 #include "Logger.h"
 #include "SecureStack/SecureStack.h"
 
-#include <cstdio>
+#include <stdio.h>
 
 static char *GlobalPrefix = NULL;
 

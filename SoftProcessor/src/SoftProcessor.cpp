@@ -39,39 +39,42 @@
 static ProcessorErrorCode ReadInstruction (SPU *spu);
 
 ProcessorErrorCode ExecuteFile (SPU *spu) {
-    PushLog (1);
+  	PushLog (1);
 
-    CheckBuffer (spu);
+  	CheckBuffer (spu);
 
-    StackInitDefault_ (&spu->processorStack);
+  	StackInitDefault_ (&spu->processorStack);
 
-    while (ReadInstruction(spu) == NO_PROCESSOR_ERRORS);
+  	while (ReadInstruction (spu) == NO_PROCESSOR_ERRORS);
 
-    StackDestruct_ (&spu->processorStack);
+  	StackDestruct_ (&spu->processorStack);
 
-    RETURN NO_PROCESSOR_ERRORS;
+  	RETURN NO_PROCESSOR_ERRORS;
 }
 
 static ProcessorErrorCode ReadInstruction (SPU *spu) {
-    PushLog (2);
+	PushLog (2);
 
-    CheckBuffer (spu);
+	CheckBuffer (spu);
 
-    ON_DEBUG (printf ("Reading command: "));
+	ON_DEBUG (printf ("Reading command: "));
 
-    CommandCode commandCode {0, 0};
-    ReadData (spu, &commandCode, CommandCode);
+	CommandCode commandCode{0, 0};
+	ReadData (spu, &commandCode, CommandCode);
 
-    const AssemblerInstruction *instruction = FindInstructionByOpcode (commandCode.opcode);
+	const AssemblerInstruction *instruction = FindInstructionByOpcode (commandCode.opcode);
 
-    if (instruction == NULL){
-        PrintErrorMessage (WRONG_INSTRUCTION, "Wrong instruction readed", NULL);
-        RETURN WRONG_INSTRUCTION;
-    }
+	if (instruction == NULL) {
+		ErrorFound (WRONG_INSTRUCTION, "Wrong instruction readed");
+	}
 
-    ON_DEBUG (printf ("%s\n", instruction->instructionName));
+	if ((~instruction->commandCode.arguments) & commandCode.arguments) {
+		ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
+	}
 
-    RETURN instruction->callbackFunction (spu, &commandCode);
+	ON_DEBUG (printf ("%s\n", instruction->instructionName));
+
+	RETURN instruction->callbackFunction (spu, &commandCode);
 }
 
 

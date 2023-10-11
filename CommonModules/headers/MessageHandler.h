@@ -20,4 +20,12 @@ void SetGlobalMessagePrefix (char *newPrefix);
 #define PrintInfoMessage(errorCode, errorMessage, messagePrefix)    PrintMessage (stdout, {errorCode, INFO_MESSAGE,    errorMessage, messagePrefix, 0})
 #define PrintSuccessMessage(errorCode, errorMessage, messagePrefix) PrintMessage (stdout, {errorCode, SUCCESS_MESSAGE, errorMessage, messagePrefix, 0})
 
+#define ErrorFound(errorCode, errorMessage)                             \
+            do {                                                        \
+                if (errorCode != NO_PROCESSOR_ERRORS) {                 \
+                    PrintErrorMessage (errorCode, errorMessage, NULL);  \
+                    RETURN errorCode;                                   \
+                }                                                       \
+            }while (0)
+
 #endif

@@ -32,8 +32,8 @@ enum ArgumentsType {
 };
 
 struct CommandCode {
-    char opcode    : 4;
-    char arguments : 4;
+    unsigned char opcode    : 4;
+    unsigned char arguments : 4;
 };
 
 typedef ProcessorErrorCode (*callbackFunction_t)(SPU *spu, CommandCode *commandCode);
