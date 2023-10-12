@@ -20,8 +20,6 @@ void AddOutFile (char **arguments);
 
 static bool PrepareForDisassembling (FileBuffer *fileBuffer, int *outFileDescriptor);
 
-// TODO add info to disasm
-
 int main (int argc, char **argv){
     PushLog (1);
 
