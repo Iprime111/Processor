@@ -4,20 +4,22 @@
 #include "FileIO.h"
 #include "Logger.h"
 #include "MessageHandler.h"
+#include "SPU.h"
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 #include "Buffer.h"
 
-#include <cstdlib>
+#include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <sys/types.h>
 
 static ProcessorErrorCode CompileLine (Buffer *binaryBuffer, Buffer *listingBuffer, TextLine *line);
-static ProcessorErrorCode GetInstructionOpcode (TextLine *line, const AssemblerInstruction **instruction, int *offset);
-static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstruction *instruction, TextLine *line, CommandCode *commandCode, char *registerIndex, elem_t *immedArgument);
-static ProcessorErrorCode EmitInstruction (Buffer *binaryBuffer, Buffer *listingBiffer, CommandCode *commandCode, char registerIndex, elem_t immedArgument);
+static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int *offset);
+static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments);
+static ProcessorErrorCode EmitInstruction (Buffer *binaryBuffer, Buffer *listingBiffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine);
 
 static ProcessorErrorCode WriteDataToFiles (Buffer *binaryBuffer, Buffer *listingBuffer, int binaryDescriptor, int listingDescriptor);
 
@@ -28,7 +30,9 @@ static ssize_t CountWhitespaces (TextLine *line);
 static ssize_t FindActualStringEnd (TextLine *line);
 static ssize_t FindActualStringBegin (TextLine *line);
 
-ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryDescriptor) {
+// TODO add compilation header
+
+ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryDescriptor, int listingDescriptor) {
     PushLog (1);
 
     custom_assert (file,        pointer_is_null, NO_BUFFER);
@@ -37,21 +41,20 @@ ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryD
 
     Buffer binaryBuffer  {0, 0, NULL};
     Buffer listingBuffer {0, 0, NULL};
-    CreateAssemblyBuffers (&binaryBuffer, &listingBuffer, file, text);
+
+
+    ErrorFound (CreateAssemblyBuffers (&binaryBuffer, &listingBuffer, file, text), "Error occuried while creating file buffers");
 
     for (size_t lineIndex = 0; lineIndex < text->line_count; lineIndex++) {
         ProcessorErrorCode errorCode = CompileLine (&binaryBuffer, &listingBuffer, text->lines + lineIndex);
 
-        if (!(errorCode & (BLANK_LINE))) {
+        if (!(errorCode & (BLANK_LINE)) && errorCode != NO_PROCESSOR_ERRORS) {
+            DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer);
             ErrorFound (errorCode, "Compilation error");
         }
     }
 
-    if (!WriteBuffer (binaryDescriptor, binaryBuffer.data, (ssize_t) binaryBuffer.currentIndex)) {
-        ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing to binary file");
-    }
-
-    WriteDataToFiles (&binaryBuffer, &listingBuffer, binaryDescriptor, -1);
+    WriteDataToFiles (&binaryBuffer, &listingBuffer, binaryDescriptor, listingDescriptor);
 
     RETURN DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer);
 }
@@ -86,14 +89,14 @@ static ProcessorErrorCode CreateAssemblyBuffers (Buffer *binaryBuffer, Buffer *l
     size_t listingAllocationSize = 0;
 
     for (size_t lineIndex = 0; lineIndex < sourceText->line_count; lineIndex++) {
-        listingAllocationSize += sourceText->lines [lineIndex].length + 15;
+        listingAllocationSize += sourceText->lines [lineIndex].length + 20;
     }
 
     listingBuffer->capacity = listingAllocationSize;
     listingBuffer->data = (char *) calloc (listingBuffer->capacity, sizeof (char));
 
     if (!listingBuffer->data) {
-        free (binaryBuffer);
+        free (binaryBuffer->data);
         ErrorFound (NO_BUFFER, "Unable to create listing file buffer");
     }
 
@@ -114,6 +117,28 @@ static ProcessorErrorCode DestroyAssemblyBuffers (Buffer *binaryBuffer, Buffer *
     RETURN NO_PROCESSOR_ERRORS;
 }
 
+static ProcessorErrorCode WriteDataToFiles (Buffer *binaryBuffer, Buffer *listingBuffer, int binaryDescriptor, int listingDescriptor) {
+    PushLog (2);
+
+    if (!WriteBuffer (binaryDescriptor, binaryBuffer->data, (ssize_t) binaryBuffer->currentIndex)) {
+        ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing to binary file");
+    }
+
+    if (listingDescriptor != -1) {
+        const char *ListingLegend = " ip \topcode\tsource\n";
+
+        if (!WriteBuffer (listingDescriptor, ListingLegend, (ssize_t) strlen (ListingLegend))) {
+            ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing to listing file");
+        }
+
+        if (!WriteBuffer (listingDescriptor, listingBuffer->data, (ssize_t) listingBuffer->currentIndex)) {
+            ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing to listing file");
+        }
+    }
+
+    RETURN NO_PROCESSOR_ERRORS;
+}
+
 static ProcessorErrorCode CompileLine (Buffer *binaryBuffer, Buffer *listingBuffer, TextLine *line) {
     PushLog (2);
     custom_assert (line,          pointer_is_null, NO_BUFFER);
@@ -125,28 +150,26 @@ static ProcessorErrorCode CompileLine (Buffer *binaryBuffer, Buffer *listingBuff
 
     ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
 
-    // Get instruction basic data
-    const AssemblerInstruction *instruction = NULL;
+    // Get instruction basic
+    InstructionArguments arguments {NAN, REGISTER_COUNT};
+    ArgumentsType permittedArguments = NO_ARGUMENTS;
+    AssemblerInstruction outputInstruction {"", {0, 0}, NULL};
     int argumentsOffset = 0;
 
-    if ((errorCode = GetInstructionOpcode (line, &instruction, &argumentsOffset)) != NO_PROCESSOR_ERRORS) {
+    if ((errorCode = GetInstructionOpcode (line, &outputInstruction, &permittedArguments, &argumentsOffset)) != NO_PROCESSOR_ERRORS) {
         RETURN errorCode;
     }
 
-    ON_DEBUG (printf ("Instruction found: %s. Arguments: ", instruction->instructionName));
+    ON_DEBUG (printf ("Instruction found: %s. Arguments: ", outputInstruction.instructionName));
 
-    char registerIndex = -1;
-    elem_t immedArgument    = {};
-    CommandCode commandCode = {0, 0};
-
-    if ((errorCode = GetInstructionArgumentsData (instruction, line, &commandCode, &registerIndex, &immedArgument)) != NO_PROCESSOR_ERRORS) {
+    if ((errorCode = GetInstructionArgumentsData (&outputInstruction, line, &arguments, permittedArguments)) != NO_PROCESSOR_ERRORS) {
         RETURN errorCode;
     }
 
-    RETURN EmitInstruction (binaryBuffer, listingBuffer, &commandCode, registerIndex, immedArgument);
+    RETURN EmitInstruction (binaryBuffer, listingBuffer, &outputInstruction, &arguments, line);
 }
 
-static ProcessorErrorCode GetInstructionOpcode (TextLine *line, const AssemblerInstruction **instruction, int *offset) {
+static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int *offset) {
     PushLog (3);
 
     custom_assert (instruction, pointer_is_null, WRONG_INSTRUCTION);
@@ -164,16 +187,21 @@ static ProcessorErrorCode GetInstructionOpcode (TextLine *line, const AssemblerI
         RETURN NO_BUFFER;
     }
 
-    *instruction = FindInstructionByName (sscanfBuffer);
+    const AssemblerInstruction *constInstruction = FindInstructionByName (sscanfBuffer);
 
-    if (!*instruction) {
+    if (!constInstruction) {
         ErrorFound (WRONG_INSTRUCTION, "Wrong instruction has been read");
     }
+
+    instruction->instructionName = constInstruction->instructionName;
+    instruction->callbackFunction = constInstruction->callbackFunction;
+
+    *permittedArguments = (ArgumentsType) constInstruction->commandCode.arguments;
 
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstruction *instruction, TextLine *line, CommandCode *commandCode, char *registerIndex, elem_t *immedArgument) {
+static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments) {
     PushLog (3);
     custom_assert (line,        pointer_is_null, NO_BUFFER);
     custom_assert (instruction, pointer_is_null, WRONG_INSTRUCTION);
@@ -184,10 +212,7 @@ static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstructio
         RETURN TOO_FEW_ARGUMENTS;
     }
 
-    commandCode->opcode = instruction->commandCode.opcode;
-
-    *registerIndex = -1;
-    *immedArgument =  0;
+    *arguments = {NAN, REGISTER_COUNT};
 
     TextLine argsLine {line->pointer, line->length };
     ssize_t offset = FindActualStringBegin (&argsLine);
@@ -196,18 +221,18 @@ static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstructio
 
     #define REGISTER(NAME, INDEX)                           \
                 if (!strcmp (#NAME, registerNameBuffer)) {  \
-                    *registerIndex = INDEX;                 \
+                    arguments->registerIndex = INDEX;       \
                     break;                                  \
                 }
 
     switch (argumentsCount) {
         case 2:
-            if (instruction->commandCode.arguments != (REGISTER_ARGUMENT | IMMED_ARGUMENT)) {
+            if (permittedArguments != (REGISTER_ARGUMENT | IMMED_ARGUMENT)) {
                 ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
             }
 
-            if (sscanf (line->pointer + offset, "%*s %3s+%lf", registerNameBuffer, immedArgument) > 0) {
-                commandCode->arguments = IMMED_ARGUMENT | REGISTER_ARGUMENT;
+            if (sscanf (line->pointer + offset, "%*s %3s+%lf", registerNameBuffer, &arguments->immedArgument) > 0) {
+                instruction->commandCode.arguments = IMMED_ARGUMENT | REGISTER_ARGUMENT;
 
                 #include "Registers.def"
 
@@ -221,18 +246,18 @@ static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstructio
             break;
 
         case 1:
-            if (sscanf (line->pointer + offset, "%*s %lf", immedArgument) > 0){
-                if (!(instruction->commandCode.arguments & IMMED_ARGUMENT)) {
+            if (sscanf (line->pointer + offset, "%*s %lf", &arguments->immedArgument) > 0){
+                if (!(permittedArguments & IMMED_ARGUMENT)) {
                     ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
                 }
-                commandCode->arguments = IMMED_ARGUMENT;
+                instruction->commandCode.arguments = IMMED_ARGUMENT;
 
             } else if (sscanf (line->pointer + offset, "%*s %s", registerNameBuffer) > 0) {
-                if (!(instruction->commandCode.arguments & REGISTER_ARGUMENT)) {
+                if (!(permittedArguments & REGISTER_ARGUMENT)) {
                     ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
                 }
 
-                commandCode->arguments = REGISTER_ARGUMENT;
+                instruction->commandCode.arguments = REGISTER_ARGUMENT;
 
                 #include "Registers.def"
 
@@ -252,26 +277,28 @@ static ProcessorErrorCode GetInstructionArgumentsData (const AssemblerInstructio
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode EmitInstruction (Buffer *binaryBuffer, Buffer *listingBiffer, CommandCode *commandCode, char registerIndex, elem_t immedArgument) {
+static ProcessorErrorCode EmitInstruction (Buffer *binaryBuffer, Buffer *listingBiffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine) {
     PushLog (3);
-    custom_assert (commandCode, pointer_is_null, WRONG_INSTRUCTION);
+    custom_assert (instruction,        pointer_is_null, WRONG_INSTRUCTION);
+    custom_assert (binaryBuffer,       pointer_is_null, WRONG_INSTRUCTION);
+    custom_assert (binaryBuffer->data, pointer_is_null, WRONG_INSTRUCTION);
 
     const size_t ServiceInfoLength = 30;
     char listingInfoBuffer [MAX_INSTRUCTION_LENGTH + ServiceInfoLength] = "";
 
-    sprintf (listingInfoBuffer, "%.4lu\t%.2x\t%4s\n", binaryBuffer->currentIndex, *(unsigned char *) commandCode, "test");
+    sprintf (listingInfoBuffer, "%.4lu\t%.2x\t\t%s\n", binaryBuffer->currentIndex, *(unsigned char *) &instruction->commandCode, sourceLine->pointer + FindActualStringBegin (sourceLine));
     WriteDataToBuffer (listingBiffer, listingInfoBuffer, strlen (listingInfoBuffer));
 
-    WriteDataToBuffer (binaryBuffer, commandCode, sizeof (CommandCode));
+    WriteDataToBuffer (binaryBuffer, &instruction->commandCode, sizeof (CommandCode));
 
-    if (commandCode->arguments & REGISTER_ARGUMENT) {
-        WriteDataToBuffer (binaryBuffer, &registerIndex, sizeof (char));
+    if (instruction->commandCode.arguments & REGISTER_ARGUMENT) {
+        WriteDataToBuffer (binaryBuffer, &arguments->registerIndex, sizeof (char));
 
         char *registerName = NULL;
 
-        #define REGISTER(NAME, INDEX)           \
-                if (registerIndex == INDEX) {   \
-                    registerName = #NAME;       \
+        #define REGISTER(NAME, INDEX)                       \
+                if (arguments->registerIndex == INDEX) {    \
+                    registerName = #NAME;                   \
                 }
 
         #include "Registers.def"
@@ -281,15 +308,15 @@ static ProcessorErrorCode EmitInstruction (Buffer *binaryBuffer, Buffer *listing
         ON_DEBUG (printf ("%s (size = %lu) ", registerName, sizeof (char)));
     }
 
-    if (commandCode->arguments & IMMED_ARGUMENT) {
-        WriteDataToBuffer (binaryBuffer, &immedArgument, sizeof (elem_t));
+    if (instruction->commandCode.arguments & IMMED_ARGUMENT) {
+        WriteDataToBuffer (binaryBuffer, &arguments->immedArgument, sizeof (elem_t));
 
-        ON_DEBUG (printf ("%lf (size = %lu)", immedArgument, sizeof (elem_t)));
+        ON_DEBUG (printf ("%lf (size = %lu)", arguments->immedArgument, sizeof (elem_t)));
     }
 
-    #define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK) \
-                if (commandCode->opcode == ((CommandCode) COMMAND_CODE).opcode)     \
-                    ASSEMBLER_CALLBACK                                              \
+    #define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)             \
+                if (instruction->commandCode.opcode == ((CommandCode) COMMAND_CODE).opcode)     \
+                    ASSEMBLER_CALLBACK                                                          \
 
 
     #include "Instructions.def"

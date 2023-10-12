@@ -14,7 +14,7 @@
 #define PushValue(spu, value)                                                       \
             do {                                                                    \
                 if (StackPush_ (&((spu)->processorStack), value) != NO_ERRORS) {    \
-                    PrintErrorMessage (STACK_ERROR, "Stack error occuried", NULL);   \
+                    PrintErrorMessage (STACK_ERROR, "Stack error occuried", NULL);  \
                     RETURN STACK_ERROR;                                             \
                 }                                                                   \
             }while (0)
@@ -38,6 +38,7 @@
 
 static ProcessorErrorCode ReadInstruction (SPU *spu);
 
+// TODO add processor dump
 ProcessorErrorCode ExecuteFile (SPU *spu) {
   	PushLog (1);
 

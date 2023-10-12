@@ -12,13 +12,15 @@
 #include "TextTypes.h"
 #include "Assembler.h"
 
-static char *SourceFile = NULL;
-static char *BinaryFile = "a.out"; // TODO think 'bout it
+static char *SourceFile  = NULL;
+static char *ListingFile = NULL;
+static char *BinaryFile  = "a.out"; // TODO think 'bout it
 
-void AddSource (char **arguments);
-void AddBinary (char **arguments);
+void AddSource  (char **arguments);
+void AddBinary  (char **arguments);
+void AddListing (char **arguments);
 
-static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer, int *outFileDescriptor);
+static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer, int *binaryDescriptor, int *listingDescriptor);
 
 // TODO create the best listing
 int main (int argc, char **argv) {
@@ -27,8 +29,9 @@ int main (int argc, char **argv) {
     SetGlobalMessagePrefix ("Assembler");
 
     //Process console line arguments
-    register_flag ("-s", "--source", AddSource, 1);
-    register_flag ("-o", "--output", AddBinary, 1);
+    register_flag ("-s", "--source",  AddSource,  1);
+    register_flag ("-l", "--listing", AddListing, 1);
+    register_flag ("-o", "--output",  AddBinary,  1);
     parse_flags (argc, argv);
     // TODO parser -> stores flags -> get("...")
     // TODO: get_flag(parser, "binary")
@@ -37,11 +40,15 @@ int main (int argc, char **argv) {
     FileBuffer fileBuffer = {};
     TextBuffer textBuffer = {};
 
-    int outFileDescriptor = -1;
+    int binaryDescriptor  = -1;
+    int listingDescriptor = -1;
 
-    if (PrepareForAssembling (&fileBuffer, &textBuffer, &outFileDescriptor)) {
-        ProcessorErrorCode errorCode = AssembleFile (&textBuffer, &fileBuffer, outFileDescriptor);
-        CloseFile (outFileDescriptor);
+    if (PrepareForAssembling (&fileBuffer, &textBuffer, &binaryDescriptor, &listingDescriptor)) {
+        ProcessorErrorCode errorCode = AssembleFile (&textBuffer, &fileBuffer, binaryDescriptor, listingDescriptor);
+
+        CloseFile (binaryDescriptor);
+        if (listingDescriptor != -1)
+            CloseFile (listingDescriptor);
 
         if (errorCode != NO_PROCESSOR_ERRORS) {
             if (remove (BinaryFile)) {
@@ -78,7 +85,18 @@ void AddBinary (char **arguments) {
     RETURN;
 }
 
-static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer, int *outFileDescriptor) {
+void AddListing (char **arguments) {
+    PushLog (3);
+
+    custom_assert (arguments,     pointer_is_null, (void)0);
+    custom_assert (arguments [0], pointer_is_null, (void)0);
+
+    ListingFile = arguments [0];
+
+    RETURN;
+}
+
+static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer, int *binaryDescriptor, int *listingDescriptor) {
     PushLog (2);
 
     if (!SourceFile) {
@@ -100,10 +118,21 @@ static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer
         RETURN false;
     }
 
-    if ((*outFileDescriptor = OpenFileWrite (BinaryFile)) == -1) {
-        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while opening binary file", NULL);
-        RETURN false;
+    if ((*binaryDescriptor = OpenFileWrite (BinaryFile)) == -1) {
+            PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while opening binary file", NULL);
+            RETURN false;
+        }
+
+    if (ListingFile) {
+        if ((*listingDescriptor = OpenFileWrite (ListingFile)) == -1) {
+            PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while opening listing file", NULL);
+            RETURN false;
+        }
+    }else {
+        *listingDescriptor = -1;
+        PrintWarningMessage (OUTPUT_FILE_ERROR, "Lising file is not specified", NULL);
     }
+
 
     RETURN true;
 }

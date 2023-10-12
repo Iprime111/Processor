@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "SPU.h"
 
+#include <math.h>
 #include <stddef.h>
 
 const long long FIXED_FLOAT_PRECISION = 1e3;
@@ -27,8 +28,14 @@ enum ProcessorErrorCode {
 };
 
 enum ArgumentsType {
+    NO_ARGUMENTS      = 0,
     IMMED_ARGUMENT    = 1 << 0,
     REGISTER_ARGUMENT = 1 << 1,
+};
+
+struct InstructionArguments {
+    elem_t immedArgument        = NAN;
+    unsigned char registerIndex = REGISTER_COUNT;
 };
 
 struct CommandCode {

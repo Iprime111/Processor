@@ -4,6 +4,6 @@
 #include "CommonModules.h"
 #include "FileIO.h"
 
-ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryDescriptor);
+ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryDescriptor, int listingDescriptor);
 
 #endif

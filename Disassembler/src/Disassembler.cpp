@@ -79,6 +79,12 @@ static ProcessorErrorCode DestroyDisassemblyBuffer (Buffer *disassemblyBuffer) {
 static ProcessorErrorCode WriteDisassemblyData (int outFileDescriptor, Buffer *disassemblyBuffer) {
     PushLog (2);
 
+    const char *DisassemblyLegend = " ip \tdisassembly\n";
+
+    if (!WriteBuffer (outFileDescriptor, DisassemblyLegend, (ssize_t) strlen (DisassemblyLegend))) {
+        ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing to the disassembly file");
+    }
+
     if (!WriteBuffer (outFileDescriptor, disassemblyBuffer->data, (ssize_t) disassemblyBuffer->currentIndex)) {
         ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing to the disassembly file");
     }
