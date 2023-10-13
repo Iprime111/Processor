@@ -37,9 +37,12 @@ ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
 
     CreateDisassemblyBuffers(&disassemblyBuffer, &headerBuffer, spu);
 
-    ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
+    ProcessorErrorCode errorCode = ReadHeader (&headerBuffer, spu);
 
-    ErrorFound (ReadHeader (&headerBuffer, spu), "Invalid header readed");
+    if (errorCode != NO_PROCESSOR_ERRORS) {
+        errorCode = (ProcessorErrorCode) (DestroyDisassemblyBuffers (&disassemblyBuffer, &headerBuffer) | errorCode);
+        ErrorFound (errorCode, "Invalid header readed");
+    }
 
     while ((errorCode = ReadInstruction (&disassemblyBuffer, spu)) == NO_PROCESSOR_ERRORS);
 
@@ -65,28 +68,34 @@ static ProcessorErrorCode ReadHeader (Buffer *headerBuffer, SPU *spu) {
     custom_assert (headerBuffer, pointer_is_null, NO_BUFFER);
     custom_assert (spu,          pointer_is_null, NO_PROCESSOR);
 
-    // Allocating memory for header + 2 '\n' symbols + '\0' symbol
-	char *header = (char *) calloc (HEADER_SIZE + 3, sizeof (char));
-
     // Can not use ReadValue macro here 'cause need to control memory allocation
-    spu->ip += HEADER_SIZE;
     if ((ssize_t) spu->ip > spu->bytecode->buffer_size) {
-        free (header);
         ErrorFound (BUFFER_ENDED, "No commands has been detected");
     }
 
-    if (!CopyVariableValue (header, spu->bytecode->buffer, HEADER_SIZE)) {
-        free (header);
-        ErrorFound (NO_BUFFER, "Error occuried while copying header data");
-    }
+    #define HEADER_FIELD(FIELD_NAME, FIELD_VALUE, ...)                                                      \
+        do {                                                                                                \
+            char headerField [sizeof (#FIELD_NAME ": " #FIELD_VALUE) + 1] = "";                             \
+            size_t fieldValuePosition = sizeof (#FIELD_NAME ": ") - 1;                                      \
+            strcat (headerField, #FIELD_NAME ": ");                                                         \
+            while (spu->ip < HEADER_SIZE && spu->bytecode->buffer [spu->ip] != '\0') {                      \
+                headerField [fieldValuePosition++] = spu->bytecode->buffer [spu->ip++];                     \
+            }                                                                                               \
+            if (strcmp (headerField + sizeof (#FIELD_NAME ": ") - 1, #FIELD_VALUE)){                        \
+                ErrorFound (WRONG_HEADER, "This binary is incompatible with current processor version");    \
+            }                                                                                               \
+            headerField [sizeof (headerField) - 2] = '\n';                                                  \
+            WriteDataToBuffer (headerBuffer, headerField, strlen (headerField));                            \
+            spu->ip++;                                                                                      \
+        }while (0);
 
-    strcat (header, "\n\n");
 
-    // TODO process header
+    #include "AssemblerHeader.def"
 
-	WriteDataToBuffer (headerBuffer, header, strlen (header));
+    #undef HEADER_FIELD
 
-    free (header);
+    spu->ip = HEADER_SIZE;
+    WriteDataToBuffer (headerBuffer, "\n\n", 2);
 
 	RETURN NO_PROCESSOR_ERRORS;
 }
@@ -113,7 +122,7 @@ static ProcessorErrorCode CreateDisassemblyBuffers (Buffer *disassemblyBuffer, B
     // Creating header file
     // size: header size + 2 of '\n' symbols + '\0' symbol
 
-    headerBuffer->capacity = HEADER_SIZE + 3;
+    headerBuffer->capacity = HEADER_SIZE * 2 + 3;
     headerBuffer->data = (char *) calloc (headerBuffer->capacity, sizeof (char));
 
     if (!headerBuffer->data) {

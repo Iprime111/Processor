@@ -3,7 +3,9 @@
 #include "CustomAssert.h"
 #include "MessageHandler.h"
 
-ProcessorErrorCode WriteDataToBuffer (Buffer *buffer, void *data, size_t dataSize) {
+// TODO buffer constructor
+
+ProcessorErrorCode WriteDataToBuffer (Buffer *buffer, const void *data, size_t dataSize) {
   	PushLog (4);
 
   	custom_assert (buffer, pointer_is_null, NO_BUFFER);
@@ -14,7 +16,7 @@ ProcessorErrorCode WriteDataToBuffer (Buffer *buffer, void *data, size_t dataSiz
   	}
 
   	for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++) {
-		buffer->data [buffer->currentIndex++] = ((char *) data) [dataIndex];
+		buffer->data [buffer->currentIndex++] = ((const char *) data) [dataIndex];
 	}
 
   	RETURN NO_PROCESSOR_ERRORS;

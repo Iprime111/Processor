@@ -28,6 +28,7 @@ enum ProcessorErrorCode {
     INPUT_FILE_ERROR    = 1 << 9,
     BLANK_LINE          = 1 << 10,
     NO_PROCESSOR        = 1 << 11,
+    WRONG_HEADER        = 1 << 12,
 };
 
 enum ArgumentsType {

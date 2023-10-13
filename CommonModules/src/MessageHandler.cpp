@@ -57,6 +57,8 @@ static void PrintError (FILE *stream, ProcessorErrorCode errorCode, CONSOLE_COLO
     MSG_ (errorCode, TOO_FEW_ARGUMENTS,  "Given instruction requires more arguments to be passed");
     MSG_ (errorCode, OUTPUT_FILE_ERROR,  "Error occuried with output file");
     MSG_ (errorCode, INPUT_FILE_ERROR,   "Error occuried with input file");
+    MSG_ (errorCode, NO_PROCESSOR,       "No available processor has been found");
+    MSG_ (errorCode, WRONG_HEADER,       "Current header has wrong format");
 
     #undef MSG_
 

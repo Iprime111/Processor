@@ -198,51 +198,56 @@ static ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescript
     // Three times header_size should be enough for header and header field's names
     // I think so...
     // TODO try to calculate needed buffer size
-    char *header = (char *) calloc(HEADER_SIZE * 3 + 3, sizeof (char));
+    Buffer headerBuffer {};
+    headerBuffer.capacity = HEADER_SIZE * 3 + 3;
+    headerBuffer.data = (char *) calloc(headerBuffer.capacity, sizeof (char));
 
-    if (!header) {
+    if (!headerBuffer.data) {
         ErrorFound (NO_BUFFER, "Can not allocate memory for temporary header buffer");
     }
 
-    #define HEADER_FIELD(FIELD_NAME, FIELD_VALUE, ...) \
-            strcat (header, #FIELD_VALUE);
+    #define HEADER_FIELD(FIELD_NAME, FIELD_VALUE, ...)      \
+            WriteDataToBuffer (&headerBuffer, #FIELD_VALUE, sizeof (#FIELD_VALUE));
 
     #include "AssemblerHeader.def"
 
     #undef HEADER_FIELD
 
-    if (!WriteBuffer (binaryDescriptor, header, (ssize_t) HEADER_SIZE)) {
-        free (header);
+    if (!WriteBuffer (binaryDescriptor, headerBuffer.data, (ssize_t) HEADER_SIZE)) {
+        free (headerBuffer.data);
         ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing header to binary file");
     }
 
-    header [0] = '\0';
+    headerBuffer.currentIndex = 0;
 
-    #define HEADER_FIELD(FIELD_NAME, FIELD_VALUE, ...) \
-            strcat (header, #FIELD_NAME ": " #FIELD_VALUE "\n");
+    #define HEADER_FIELD(FIELD_NAME, FIELD_VALUE, ...)                                  \
+            do {                                                                        \
+                char *headerField = #FIELD_NAME ": " #FIELD_VALUE "\n";                 \
+                WriteDataToBuffer (&headerBuffer, headerField, strlen (headerField));   \
+            } while (0);
 
         #include "AssemblerHeader.def"
 
     #undef HEADER_FIELD
 
-    strcat (header, "\n\n");
+    WriteDataToBuffer (&headerBuffer, "\n\n", strlen ("\n\n"));
 
 
     if (listingDescriptor != -1) {
         const char HeaderLegend [] = "HEADER:\n";
 
         if (!WriteBuffer (listingDescriptor, HeaderLegend, (ssize_t) sizeof (HeaderLegend) - 1)) {
-            free (header);
+            free (headerBuffer.data);
             ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing header to listing file");
         }
 
-        if (!WriteBuffer (listingDescriptor, header, (ssize_t) strlen (header))) {
-            free (header);
+        if (!WriteBuffer (listingDescriptor, headerBuffer.data, (ssize_t) strlen (headerBuffer.data))) {
+            free (headerBuffer.data);
             ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing header to listing file");
         }
     }
 
-    free (header);
+    free (headerBuffer.data);
     RETURN NO_PROCESSOR_ERRORS;
 }
 
