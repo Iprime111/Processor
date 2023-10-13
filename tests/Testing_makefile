@@ -1,0 +1,15 @@
+.PHONY: all, test-assembler, test-disassembler, test-processor
+
+default: all
+
+test-assembler:
+	@./bin/Assembler -s ../tests/test.asm -l ../tests/listing -o ../tests/test
+
+test-disassembler: test-assembler
+	@./bin/Disassembler -b ../tests/test -o ../tests/test.disasm
+
+test-processor: test-assembler
+	@./bin/SoftProcessor -b ../tests/test
+
+all: test-assembler test-disassembler test-processor
+

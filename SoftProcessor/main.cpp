@@ -22,6 +22,8 @@ static bool PrepareForExecuting (FileBuffer *fileBuffer);
 int main (int argc, char **argv){
     PushLog (1);
 
+    SetGlobalMessagePrefix ("Processor");
+
     //Process console line arguments
     register_flag ("-b", "--binary", AddBinary, 1);
     parse_flags (argc, argv);

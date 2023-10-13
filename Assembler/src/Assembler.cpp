@@ -9,6 +9,7 @@
 #include "Stack/Stack.h"
 #include "Buffer.h"
 
+#include <cstdlib>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,6 +23,7 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
 static ProcessorErrorCode EmitInstruction (Buffer *binaryBuffer, Buffer *listingBiffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine);
 
 static ProcessorErrorCode WriteDataToFiles (Buffer *binaryBuffer, Buffer *listingBuffer, int binaryDescriptor, int listingDescriptor);
+static ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescriptor);
 
 static ProcessorErrorCode CreateAssemblyBuffers (Buffer *binaryBuffer, Buffer *listingBuffer, FileBuffer *sourceFile, TextBuffer *sourceText);
 static ProcessorErrorCode DestroyAssemblyBuffers (Buffer *binaryBuffer, Buffer *listingBuffer);
@@ -42,21 +44,65 @@ ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryD
     Buffer binaryBuffer  {0, 0, NULL};
     Buffer listingBuffer {0, 0, NULL};
 
+    ON_DEBUG (PrintSuccessMessage ("Starting assembly...", NULL));
 
     ErrorFound (CreateAssemblyBuffers (&binaryBuffer, &listingBuffer, file, text), "Error occuried while creating file buffers");
 
+    ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
+
     for (size_t lineIndex = 0; lineIndex < text->line_count; lineIndex++) {
-        ProcessorErrorCode errorCode = CompileLine (&binaryBuffer, &listingBuffer, text->lines + lineIndex);
+        errorCode = CompileLine (&binaryBuffer, &listingBuffer, text->lines + lineIndex);
 
         if (!(errorCode & (BLANK_LINE)) && errorCode != NO_PROCESSOR_ERRORS) {
-            DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer);
+            errorCode = (ProcessorErrorCode) (errorCode | DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer));
             ErrorFound (errorCode, "Compilation error");
         }
     }
 
-    WriteDataToFiles (&binaryBuffer, &listingBuffer, binaryDescriptor, listingDescriptor);
+    errorCode = WriteDataToFiles (&binaryBuffer, &listingBuffer, binaryDescriptor, listingDescriptor);
 
-    RETURN DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer);
+    if (errorCode != NO_PROCESSOR_ERRORS) {
+        errorCode = (ProcessorErrorCode) (errorCode | DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer));
+        ErrorFound (errorCode, "Error occuried while writing data to output file");
+    }
+
+    ErrorFound (DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer), "Error occuried while destroying assembly buffers");
+
+    PrintSuccessMessage ("Assembly finished successfully!", NULL);
+    RETURN NO_PROCESSOR_ERRORS;
+}
+
+static ProcessorErrorCode CompileLine (Buffer *binaryBuffer, Buffer *listingBuffer, TextLine *line) {
+    PushLog (2);
+    custom_assert (line,          pointer_is_null, NO_BUFFER);
+    custom_assert (line->pointer, pointer_is_null, NO_BUFFER);
+
+    if (FindActualStringBegin (line) < 0) {
+        RETURN BLANK_LINE;
+    }
+
+    ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
+
+    InstructionArguments arguments {NAN, REGISTER_COUNT};
+    ArgumentsType permittedArguments = NO_ARGUMENTS;
+    AssemblerInstruction outputInstruction {"", {0, 0}, NULL};
+    int argumentsOffset = 0;
+
+    if ((errorCode = GetInstructionOpcode (line, &outputInstruction, &permittedArguments, &argumentsOffset)) != NO_PROCESSOR_ERRORS) {
+        RETURN errorCode;
+    }
+
+    #ifndef _NDEBUG
+        char message [128] = "";
+        sprintf (message, "Instruction found: %s", outputInstruction.instructionName);
+        PrintInfoMessage (message, NULL);
+    #endif
+
+    if ((errorCode = GetInstructionArgumentsData (&outputInstruction, line, &arguments, permittedArguments)) != NO_PROCESSOR_ERRORS) {
+        RETURN errorCode;
+    }
+
+    RETURN EmitInstruction (binaryBuffer, listingBuffer, &outputInstruction, &arguments, line);
 }
 
 static ProcessorErrorCode CreateAssemblyBuffers (Buffer *binaryBuffer, Buffer *listingBuffer, FileBuffer *sourceFile, TextBuffer *sourceText) {
@@ -92,7 +138,7 @@ static ProcessorErrorCode CreateAssemblyBuffers (Buffer *binaryBuffer, Buffer *l
         listingAllocationSize += sourceText->lines [lineIndex].length + 20;
     }
 
-    listingBuffer->capacity = listingAllocationSize;
+    listingBuffer->capacity = listingAllocationSize + HEADER_SIZE;
     listingBuffer->data = (char *) calloc (listingBuffer->capacity, sizeof (char));
 
     if (!listingBuffer->data) {
@@ -120,6 +166,12 @@ static ProcessorErrorCode DestroyAssemblyBuffers (Buffer *binaryBuffer, Buffer *
 static ProcessorErrorCode WriteDataToFiles (Buffer *binaryBuffer, Buffer *listingBuffer, int binaryDescriptor, int listingDescriptor) {
     PushLog (2);
 
+    custom_assert (binaryBuffer,           pointer_is_null,   NO_BUFFER);
+    custom_assert (listingBuffer,          pointer_is_null,   NO_BUFFER);
+    custom_assert (binaryDescriptor != -1, invalid_arguments, OUTPUT_FILE_ERROR);
+
+    ErrorFound (WriteHeader (binaryDescriptor, listingDescriptor), "Error occuried while writing header");
+
     if (!WriteBuffer (binaryDescriptor, binaryBuffer->data, (ssize_t) binaryBuffer->currentIndex)) {
         ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing to binary file");
     }
@@ -139,34 +191,59 @@ static ProcessorErrorCode WriteDataToFiles (Buffer *binaryBuffer, Buffer *listin
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode CompileLine (Buffer *binaryBuffer, Buffer *listingBuffer, TextLine *line) {
+static ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescriptor) {
     PushLog (2);
-    custom_assert (line,          pointer_is_null, NO_BUFFER);
-    custom_assert (line->pointer, pointer_is_null, NO_BUFFER);
+    custom_assert (binaryDescriptor != -1, invalid_arguments, OUTPUT_FILE_ERROR);
 
-    if (FindActualStringBegin (line) < 0) {
-        RETURN BLANK_LINE;
+    // Three times header_size should be enough for header and header field's names
+    // I think so...
+    // TODO try to calculate needed buffer size
+    char *header = (char *) calloc(HEADER_SIZE * 3 + 3, sizeof (char));
+
+    if (!header) {
+        ErrorFound (NO_BUFFER, "Can not allocate memory for temporary header buffer");
     }
 
-    ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
+    #define HEADER_FIELD(FIELD_NAME, FIELD_VALUE, ...) \
+            strcat (header, #FIELD_VALUE);
 
-    // Get instruction basic
-    InstructionArguments arguments {NAN, REGISTER_COUNT};
-    ArgumentsType permittedArguments = NO_ARGUMENTS;
-    AssemblerInstruction outputInstruction {"", {0, 0}, NULL};
-    int argumentsOffset = 0;
+    #include "AssemblerHeader.def"
 
-    if ((errorCode = GetInstructionOpcode (line, &outputInstruction, &permittedArguments, &argumentsOffset)) != NO_PROCESSOR_ERRORS) {
-        RETURN errorCode;
+    #undef HEADER_FIELD
+
+    if (!WriteBuffer (binaryDescriptor, header, (ssize_t) HEADER_SIZE)) {
+        free (header);
+        ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing header to binary file");
     }
 
-    ON_DEBUG (printf ("Instruction found: %s. Arguments: ", outputInstruction.instructionName));
+    header [0] = '\0';
 
-    if ((errorCode = GetInstructionArgumentsData (&outputInstruction, line, &arguments, permittedArguments)) != NO_PROCESSOR_ERRORS) {
-        RETURN errorCode;
+    #define HEADER_FIELD(FIELD_NAME, FIELD_VALUE, ...) \
+            strcat (header, #FIELD_NAME ": " #FIELD_VALUE "\n");
+
+        #include "AssemblerHeader.def"
+
+    #undef HEADER_FIELD
+
+    strcat (header, "\n\n");
+
+
+    if (listingDescriptor != -1) {
+        const char HeaderLegend [] = "HEADER:\n";
+
+        if (!WriteBuffer (listingDescriptor, HeaderLegend, (ssize_t) sizeof (HeaderLegend) - 1)) {
+            free (header);
+            ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing header to listing file");
+        }
+
+        if (!WriteBuffer (listingDescriptor, header, (ssize_t) strlen (header))) {
+            free (header);
+            ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing header to listing file");
+        }
     }
 
-    RETURN EmitInstruction (binaryBuffer, listingBuffer, &outputInstruction, &arguments, line);
+    free (header);
+    RETURN NO_PROCESSOR_ERRORS;
 }
 
 static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int *offset) {
@@ -194,6 +271,7 @@ static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruc
     }
 
     instruction->instructionName = constInstruction->instructionName;
+    instruction->commandCode.opcode = constInstruction->commandCode.opcode;
     instruction->callbackFunction = constInstruction->callbackFunction;
 
     *permittedArguments = (ArgumentsType) constInstruction->commandCode.arguments;
@@ -291,6 +369,8 @@ static ProcessorErrorCode EmitInstruction (Buffer *binaryBuffer, Buffer *listing
 
     WriteDataToBuffer (binaryBuffer, &instruction->commandCode, sizeof (CommandCode));
 
+    ON_DEBUG (char message [128] = "Arguments: ");
+
     if (instruction->commandCode.arguments & REGISTER_ARGUMENT) {
         WriteDataToBuffer (binaryBuffer, &arguments->registerIndex, sizeof (char));
 
@@ -305,14 +385,17 @@ static ProcessorErrorCode EmitInstruction (Buffer *binaryBuffer, Buffer *listing
 
         #undef REGISTER
 
-        ON_DEBUG (printf ("%s (size = %lu) ", registerName, sizeof (char)));
+        sprintf (message + strlen (message), "%s (size = %lu) ", registerName, sizeof (char));
     }
 
     if (instruction->commandCode.arguments & IMMED_ARGUMENT) {
         WriteDataToBuffer (binaryBuffer, &arguments->immedArgument, sizeof (elem_t));
 
-        ON_DEBUG (printf ("%lf (size = %lu)", arguments->immedArgument, sizeof (elem_t)));
+        sprintf (message + strlen (message), "%lf (size = %lu)", arguments->immedArgument, sizeof (elem_t));
     }
+
+    // check if message != "Arguments: "
+    ON_DEBUG (if (message [12] != '\0'){ PrintInfoMessage (message, NULL);})
 
     #define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)             \
                 if (instruction->commandCode.opcode == ((CommandCode) COMMAND_CODE).opcode)     \
@@ -323,8 +406,6 @@ static ProcessorErrorCode EmitInstruction (Buffer *binaryBuffer, Buffer *listing
 
     #undef INSTRUCTION
     #undef WriteDataToBuffer
-
-    ON_DEBUG (printf ("\n"));
 
     RETURN NO_PROCESSOR_ERRORS;
 }

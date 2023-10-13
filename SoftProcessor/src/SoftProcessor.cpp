@@ -37,12 +37,15 @@
             }
 
 static ProcessorErrorCode ReadInstruction (SPU *spu);
+static ProcessorErrorCode ReadHeader (SPU *spu);
 
 // TODO add processor dump
 ProcessorErrorCode ExecuteFile (SPU *spu) {
   	PushLog (1);
 
   	CheckBuffer (spu);
+
+	ReadHeader (spu);
 
   	StackInitDefault_ (&spu->processorStack);
 
@@ -53,12 +56,20 @@ ProcessorErrorCode ExecuteFile (SPU *spu) {
   	RETURN NO_PROCESSOR_ERRORS;
 }
 
+static ProcessorErrorCode ReadHeader (SPU *spu) {
+	PushLog (2);
+
+	spu->ip += HEADER_SIZE;
+
+	// TODO process header
+
+	RETURN NO_PROCESSOR_ERRORS;
+}
+
 static ProcessorErrorCode ReadInstruction (SPU *spu) {
 	PushLog (2);
 
 	CheckBuffer (spu);
-
-	ON_DEBUG (printf ("Reading command: "));
 
 	CommandCode commandCode{0, 0};
 	ReadData (spu, &commandCode, CommandCode);
@@ -73,7 +84,11 @@ static ProcessorErrorCode ReadInstruction (SPU *spu) {
 		ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
 	}
 
-	ON_DEBUG (printf ("%s\n", instruction->instructionName));
+	#ifndef _NDEBUG
+        char message [128] = "";
+        sprintf (message, "Reading command %s", instruction->instructionName);
+        PrintInfoMessage (message, NULL);
+    #endif
 
 	RETURN instruction->callbackFunction (spu, &commandCode);
 }

@@ -10,15 +10,31 @@ INSTRUCTION (out, {1 COMMA 0}, {
     elem_t value {};
     PopValue(spu, &value);
 
+    printf_color (CONSOLE_WHITE, CONSOLE_BOLD,
+    "╔═══════════════════════════════╗\n"
+    "║ Output data:                  ║\n"
+    "╚═══════════════════════════════╝\n"
+    "\033[15C \033[2A"
+    ); //Escape codes for positioning cursor
+
     PrintData (CONSOLE_DEFAULT, CONSOLE_BOLD, stdout, value);
+    printf ("\033[1B\r");
+
     fputs ("\n", stdout);
 }, {})
 
 INSTRUCTION (in, {2 COMMA 0}, {
     elem_t value {};
 
-    printf_color (CONSOLE_WHITE, CONSOLE_BOLD, "Enter value: ");
+    printf_color (CONSOLE_WHITE, CONSOLE_BOLD,
+    "╔═══════════════════════════════╗\n"
+    "║ Enter value:                  ║\n"
+    "╚═══════════════════════════════╝\n"
+    "\033[14C \033[2A"
+    ); //Escape codes for positioning cursor
+
     scanf ("%lf", &value);
+    printf ("\033[1B\r");
 
     PushValue (spu, value);
 

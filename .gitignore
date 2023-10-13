@@ -1,3 +1,7 @@
 .cache
 build
 .vscode
+test
+listing
+test.disasm
+

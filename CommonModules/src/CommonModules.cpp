@@ -1,7 +1,11 @@
 #include "CustomAssert.h"
 #include "CommonModules.h"
+#include "Logger.h"
 
 #include <string.h>
+#include <string>
+
+const size_t HEADER_SIZE = GetHeaderSize ();
 
 #define INSTRUCTION(NAME, COMMAND_CODE, ...)        \
             {                                       \
@@ -56,4 +60,19 @@ bool CopyVariableValue (void *destination, void *source, size_t size) {
     }
 
     RETURN true;
+}
+
+size_t GetHeaderSize () {
+    PushLog (4);
+
+    #define HEADER_FIELD(FIELD_NAME, FIELD_VALUE, ...)                  \
+                if (!strcmp (#FIELD_NAME, "ASSEMBLER_HEADER_SIZE")){    \
+                    RETURN std::stoul (#FIELD_VALUE);                   \
+                }
+
+    #include "AssemblerHeader.def"
+
+    #undef HEADER_FIELD
+
+    RETURN 0;
 }

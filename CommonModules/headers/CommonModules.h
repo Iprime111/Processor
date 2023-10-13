@@ -13,6 +13,8 @@ const long long FIXED_FLOAT_PRECISION = 1e3;
 const size_t MAX_INSTRUCTION_LENGTH = 100;
 const size_t MAX_ARGUMENTS_COUNT = 5;
 
+extern const size_t HEADER_SIZE;
+
 enum ProcessorErrorCode {
     NO_PROCESSOR_ERRORS = 0,
     WRONG_INSTRUCTION   = 1 << 1,
@@ -25,6 +27,7 @@ enum ProcessorErrorCode {
     OUTPUT_FILE_ERROR   = 1 << 8,
     INPUT_FILE_ERROR    = 1 << 9,
     BLANK_LINE          = 1 << 10,
+    NO_PROCESSOR        = 1 << 11,
 };
 
 enum ArgumentsType {
@@ -63,7 +66,10 @@ struct AssemblerInstruction {
 
 const AssemblerInstruction *FindInstructionByName   (char *name);
 const AssemblerInstruction *FindInstructionByOpcode (int instruction);
+
 bool CopyVariableValue (void *destination, void *source, size_t size);
+
+size_t GetHeaderSize ();
 
 #define CheckBuffer(spu)                                                                            \
             do {                                                                                    \
@@ -72,15 +78,17 @@ bool CopyVariableValue (void *destination, void *source, size_t size);
             }while (0)
 
 
-#define ReadData(spu, destination, type)                                        \
-        do {                                                                    \
-            char *bufferPointer = (spu)->bytecode->buffer + (spu)->ip;          \
-            custom_assert (bufferPointer, pointer_is_null, NO_BUFFER);          \
-            if ((ssize_t) (spu)->ip >= (spu)->bytecode->buffer_size) {          \
-                RETURN BUFFER_ENDED;                                            \
-            }                                                                   \
-            CopyVariableValue (destination, bufferPointer, sizeof (type));      \
-            (spu)->ip += sizeof (type);                                         \
+#define ReadData(spu, destination, type)                                            \
+        do {                                                                        \
+            char *bufferPointer = (spu)->bytecode->buffer + (spu)->ip;              \
+            custom_assert (bufferPointer, pointer_is_null, NO_BUFFER);              \
+            if ((ssize_t) (spu)->ip >= (spu)->bytecode->buffer_size) {              \
+                RETURN BUFFER_ENDED;                                                \
+            }                                                                       \
+            if (!CopyVariableValue (destination, bufferPointer, sizeof (type))) {   \
+                RETURN NO_BUFFER;                                                   \
+            }                                                                       \
+            (spu)->ip += sizeof (type);                                             \
         }while (0)
 
 

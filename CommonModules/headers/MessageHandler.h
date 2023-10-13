@@ -15,10 +15,10 @@ struct ProcessorMessage {
 ProcessorErrorCode PrintMessage (FILE *stream, ProcessorMessage message);
 void SetGlobalMessagePrefix (char *newPrefix);
 
-#define PrintErrorMessage(errorCode, errorMessage, messagePrefix)   PrintMessage (stderr, {errorCode, ERROR_MESSAGE,   errorMessage, messagePrefix, 0})
-#define PrintWarningMessage(errorCode, errorMessage, messagePrefix) PrintMessage (stderr, {errorCode, WARNING_MESSAGE, errorMessage, messagePrefix, 0})
-#define PrintInfoMessage(errorCode, errorMessage, messagePrefix)    PrintMessage (stdout, {errorCode, INFO_MESSAGE,    errorMessage, messagePrefix, 0})
-#define PrintSuccessMessage(errorCode, errorMessage, messagePrefix) PrintMessage (stdout, {errorCode, SUCCESS_MESSAGE, errorMessage, messagePrefix, 0})
+#define PrintErrorMessage(errorCode, errorMessage, messagePrefix)   PrintMessage (stderr, {errorCode,           ERROR_MESSAGE,   errorMessage, messagePrefix, 0})
+#define PrintWarningMessage(errorCode, errorMessage, messagePrefix) PrintMessage (stderr, {errorCode,           WARNING_MESSAGE, errorMessage, messagePrefix, 0})
+#define PrintInfoMessage(errorMessage, messagePrefix)               PrintMessage (stdout, {NO_PROCESSOR_ERRORS, INFO_MESSAGE,    errorMessage, messagePrefix, 0})
+#define PrintSuccessMessage(errorMessage, messagePrefix)            PrintMessage (stdout, {NO_PROCESSOR_ERRORS, SUCCESS_MESSAGE, errorMessage, messagePrefix, 0})
 
 #define ErrorFound(errorCode, errorMessage)                             \
             do {                                                        \

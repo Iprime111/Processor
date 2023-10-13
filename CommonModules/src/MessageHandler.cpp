@@ -37,17 +37,16 @@ void SetGlobalMessagePrefix (char *newPrefix) {
 static void PrintError (FILE *stream, ProcessorErrorCode errorCode, CONSOLE_COLOR color) {
     PushLog (4);
 
+    if (errorCode == NO_PROCESSOR_ERRORS) {
+        RETURN;
+    }
+
     fprintf_color (color, CONSOLE_NORMAL, stream, "(");
 
     #define MSG_(errorCode, patternCode, message)                                                   \
                 if (errorCode & patternCode) {                                                      \
                     fprintf_color (color, CONSOLE_NORMAL, stream, " " #patternCode ": " message);   \
                 }
-
-    if (errorCode == NO_PROCESSOR_ERRORS) {
-        printf_color (color, CONSOLE_NORMAL, "No errors have been detected)");
-        RETURN;
-    }
 
     MSG_ (errorCode, WRONG_INSTRUCTION,  "Readed instruction do not exist");
     MSG_ (errorCode, BUFFER_ENDED,       "Command buffer ended");
