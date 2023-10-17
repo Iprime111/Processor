@@ -1,3 +1,4 @@
+#include "AssemblyHeader.h"
 #include "MessageHandler.h"
 #include "SoftProcessor.h"
 #include "ColorConsole.h"
@@ -9,7 +10,8 @@
 #include "Stack/Stack.h"
 #include "SPU.h"
 
-#include <cstdio>
+#include <stdio.h>
+#include <string.h>
 
 #define PushValue(spu, value)                                                       \
             do {                                                                    \
@@ -59,9 +61,24 @@ ProcessorErrorCode ExecuteFile (SPU *spu) {
 static ProcessorErrorCode ReadHeader (SPU *spu) {
 	PushLog (2);
 
-	spu->ip += HEADER_SIZE;
+	custom_assert (spu, pointer_is_null, NO_PROCESSOR);
 
-	// TODO process header
+	Header mainHeader {};
+    Header readedHeader {};
+    InitHeader (&mainHeader);
+
+    ReadData (spu, &readedHeader, Header);
+
+    #define CheckHeaderField(field, predicate)                                      \
+                if (!(predicate)) {                                                 \
+                    ErrorFound (WRONG_HEADER, "Header field " #field " is wrong");  \
+                }
+
+    CheckHeaderField (SIGNATURE,  readedHeader.signature == mainHeader.signature);
+    CheckHeaderField (VERSION,    !strcmp (readedHeader.version,   mainHeader.version));
+    CheckHeaderField (BYTE_ORDER, !strcmp (readedHeader.byteOrder, mainHeader.byteOrder));
+
+    #undef CheckHeaderField
 
 	RETURN NO_PROCESSOR_ERRORS;
 }

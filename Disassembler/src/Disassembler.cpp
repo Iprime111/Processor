@@ -1,4 +1,5 @@
 #include "Disassembler.h"
+#include "AssemblyHeader.h"
 #include "Buffer.h"
 #include "ColorConsole.h"
 #include "CommonModules.h"
@@ -14,28 +15,29 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <endian.h>
 
-static ProcessorErrorCode ReadInstruction (Buffer *disassemblyBuffer, SPU *spu);
+static ProcessorErrorCode ReadInstruction (Buffer <char> *disassemblyBuffer, SPU *spu);
 static ProcessorErrorCode ReadArguments (const AssemblerInstruction *instruction, CommandCode *commandCode, SPU *spu, char *commandLine);
-static ProcessorErrorCode ReadHeader (Buffer *headerBuffer, SPU *spu) ;
+static ProcessorErrorCode ReadHeader (Buffer <char> *headerBuffer, SPU *spu) ;
 
-static ProcessorErrorCode WriteDisassemblyData (int outFileDescriptor, Buffer *disassemblyBuffer, Buffer *headerBuffer);
-static ProcessorErrorCode WriteHeaderData (int outFileDescriptor, Buffer *headerBuffer);
+static ProcessorErrorCode WriteDisassemblyData (int outFileDescriptor, Buffer <char> *disassemblyBuffer, Buffer <char> *headerBuffer);
+static ProcessorErrorCode WriteHeaderData (int outFileDescriptor, Buffer <char> *headerBuffer);
 
-static ProcessorErrorCode CreateDisassemblyBuffers (Buffer *disassemblyBuffer, Buffer *headerBuffer, SPU *spu);
-static ProcessorErrorCode DestroyDisassemblyBuffers (Buffer *disassemblyBuffer, Buffer *headerBuffer);
+static ProcessorErrorCode CreateDisassemblyBuffers (Buffer <char> *disassemblyBuffer, Buffer <char> *headerBuffer, SPU *spu);
+static ProcessorErrorCode DestroyDisassemblyBuffers (Buffer <char> *disassemblyBuffer, Buffer <char> *headerBuffer);
 
 ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
     PushLog (1);
 
     CheckBuffer (spu);
 
-    Buffer disassemblyBuffer {};
-    Buffer headerBuffer      {};
+    Buffer <char> disassemblyBuffer {};
+    Buffer <char> headerBuffer      {};
 
     ON_DEBUG (PrintSuccessMessage ("Starting disassembly...", NULL));
 
-    CreateDisassemblyBuffers(&disassemblyBuffer, &headerBuffer, spu);
+    CreateDisassemblyBuffers (&disassemblyBuffer, &headerBuffer, spu);
 
     ProcessorErrorCode errorCode = ReadHeader (&headerBuffer, spu);
 
@@ -62,46 +64,39 @@ ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode ReadHeader (Buffer *headerBuffer, SPU *spu) {
+static ProcessorErrorCode ReadHeader (Buffer <char> *headerBuffer, SPU *spu) {
 	PushLog (2);
 
     custom_assert (headerBuffer, pointer_is_null, NO_BUFFER);
     custom_assert (spu,          pointer_is_null, NO_PROCESSOR);
 
-    // Can not use ReadValue macro here 'cause need to control memory allocation
-    if ((ssize_t) spu->ip > spu->bytecode->buffer_size) {
-        ErrorFound (BUFFER_ENDED, "No commands has been detected");
-    }
+    Header mainHeader {};
+    Header readHeader {};
+    InitHeader (&mainHeader);
 
-    #define HEADER_FIELD(FIELD_NAME, FIELD_VALUE, ...)                                                      \
-        do {                                                                                                \
-            char headerField [sizeof (#FIELD_NAME ": " #FIELD_VALUE) + 1] = "";                             \
-            size_t fieldValuePosition = sizeof (#FIELD_NAME ": ") - 1;                                      \
-            strcat (headerField, #FIELD_NAME ": ");                                                         \
-            while (spu->ip < HEADER_SIZE && spu->bytecode->buffer [spu->ip] != '\0') {                      \
-                headerField [fieldValuePosition++] = spu->bytecode->buffer [spu->ip++];                     \
-            }                                                                                               \
-            if (strcmp (headerField + sizeof (#FIELD_NAME ": ") - 1, #FIELD_VALUE)){                        \
-                ErrorFound (WRONG_HEADER, "This binary is incompatible with current processor version");    \
-            }                                                                                               \
-            headerField [sizeof (headerField) - 2] = '\n';                                                  \
-            WriteDataToBuffer (headerBuffer, headerField, strlen (headerField));                            \
-            spu->ip++;                                                                                      \
-        }while (0);
+    ReadData (spu, &readHeader, Header);
+
+    #define CheckHeaderField(field, fieldSize, predicate)                           \
+                if (!(predicate)) {                                                 \
+                    ErrorFound (WRONG_HEADER, "Header field " #field " is wrong");  \
+                }else {                                                             \
+                    WriteHeaderField (headerBuffer, &readHeader, field, fieldSize); \
+                }
 
 
-    #include "AssemblerHeader.def"
+    CheckHeaderField (signature, sizeof (unsigned short),        readHeader.signature == mainHeader.signature);
+    CheckHeaderField (version,   sizeof (VERSION) - 1,           !strcmp (readHeader.version,   mainHeader.version));
+    CheckHeaderField (byteOrder, sizeof (SYSTEM_BYTE_ORDER) - 1, !strcmp (readHeader.byteOrder, mainHeader.byteOrder));
 
-    #undef HEADER_FIELD
+    #undef CheckHeaderField
 
-    spu->ip = HEADER_SIZE;
-    WriteDataToBuffer (headerBuffer, "\n\n", 2);
+    WriteDataToBufferErrorCheck ("Error occuried while writing new line to header buffer", headerBuffer, "\n\n", 2);
 
 	RETURN NO_PROCESSOR_ERRORS;
 }
 
 
-static ProcessorErrorCode CreateDisassemblyBuffers (Buffer *disassemblyBuffer, Buffer *headerBuffer, SPU *spu) {
+static ProcessorErrorCode CreateDisassemblyBuffers (Buffer <char> *disassemblyBuffer, Buffer <char> *headerBuffer, SPU *spu) {
     PushLog (3);
 
     custom_assert (disassemblyBuffer, pointer_is_null, NO_BUFFER);
@@ -112,27 +107,27 @@ static ProcessorErrorCode CreateDisassemblyBuffers (Buffer *disassemblyBuffer, B
     //0000\t  push ...
     //worst case: 1 byte of instruction = 9 bytes of symbols + '\n' symbol = 10 bytes
 
-    disassemblyBuffer->capacity = (size_t) spu->bytecode->buffer_size * 10 + HEADER_SIZE;
+    disassemblyBuffer->capacity = (size_t) spu->bytecode->buffer_size * 10 + sizeof (Header);
     disassemblyBuffer->data = (char *) calloc (disassemblyBuffer->capacity, sizeof (char));
 
     if (!disassemblyBuffer->data) {
-        ErrorFound (NO_BUFFER, "Unable to create disassembly file buffer");
+        ErrorFound (NO_BUFFER, "Unable to create disassembly file Buffer <char>");
     }
 
     // Creating header file
-    // size: header size + 2 of '\n' symbols + '\0' symbol
+    // size: header size + 100
 
-    headerBuffer->capacity = HEADER_SIZE * 2 + 3;
+    headerBuffer->capacity = sizeof (Header) + 100;
     headerBuffer->data = (char *) calloc (headerBuffer->capacity, sizeof (char));
 
     if (!headerBuffer->data) {
-        ErrorFound (NO_BUFFER, "Unable to create header buffer");
+        ErrorFound (NO_BUFFER, "Unable to create header Buffer <char>");
     }
 
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode DestroyDisassemblyBuffers (Buffer *disassemblyBuffer, Buffer *headerBuffer) {
+static ProcessorErrorCode DestroyDisassemblyBuffers (Buffer <char> *disassemblyBuffer, Buffer <char> *headerBuffer) {
     PushLog (3);
 
     if (disassemblyBuffer) {
@@ -146,7 +141,7 @@ static ProcessorErrorCode DestroyDisassemblyBuffers (Buffer *disassemblyBuffer, 
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode WriteHeaderData (int outFileDescriptor, Buffer *headerBuffer) {
+static ProcessorErrorCode WriteHeaderData (int outFileDescriptor, Buffer <char> *headerBuffer) {
     PushLog (2);
 
     const char HeaderLabel [] = "HEADER:\n";
@@ -162,7 +157,7 @@ static ProcessorErrorCode WriteHeaderData (int outFileDescriptor, Buffer *header
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode WriteDisassemblyData (int outFileDescriptor, Buffer *disassemblyBuffer, Buffer *headerBuffer) {
+static ProcessorErrorCode WriteDisassemblyData (int outFileDescriptor, Buffer <char> *disassemblyBuffer, Buffer <char> *headerBuffer) {
     PushLog (2);
 
     ErrorFound (WriteHeaderData (outFileDescriptor, headerBuffer), "Error occuried while reading header");
@@ -180,7 +175,7 @@ static ProcessorErrorCode WriteDisassemblyData (int outFileDescriptor, Buffer *d
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode ReadInstruction (Buffer *disassemblyBuffer, SPU *spu) {
+static ProcessorErrorCode ReadInstruction (Buffer <char> *disassemblyBuffer, SPU *spu) {
     PushLog (2);
 
     CheckBuffer (spu);
@@ -206,7 +201,7 @@ static ProcessorErrorCode ReadInstruction (Buffer *disassemblyBuffer, SPU *spu) 
 
     char commandLine [MAX_INSTRUCTION_LENGTH] = "";
     int bytesPrinted = 0;
-    sprintf (commandLine, "%.4lu\t%s%n", spu->ip - sizeof (commandCode), instruction->instructionName, &bytesPrinted);
+    sprintf (commandLine, "%.4lu\t%s%n", spu->ip - sizeof (commandCode) - sizeof (Header), instruction->instructionName, &bytesPrinted);
 
     ProcessorErrorCode errorCode = ReadArguments (instruction, &commandCode, spu, commandLine + bytesPrinted);
     if (errorCode != NO_PROCESSOR_ERRORS) {

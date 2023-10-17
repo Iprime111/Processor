@@ -13,8 +13,6 @@ const long long FIXED_FLOAT_PRECISION = 1e3;
 const size_t MAX_INSTRUCTION_LENGTH = 100;
 const size_t MAX_ARGUMENTS_COUNT = 5;
 
-extern const size_t HEADER_SIZE;
-
 enum ProcessorErrorCode {
     NO_PROCESSOR_ERRORS = 0,
     WRONG_INSTRUCTION   = 1 << 1,
@@ -43,8 +41,8 @@ struct InstructionArguments {
 };
 
 struct CommandCode {
-    unsigned char opcode    : 4;
-    unsigned char arguments : 4;
+    unsigned char opcode    : 5;
+    unsigned char arguments : 3;
 };
 
 typedef ProcessorErrorCode (*callbackFunction_t)(SPU *spu, CommandCode *commandCode);
@@ -69,8 +67,7 @@ const AssemblerInstruction *FindInstructionByName   (char *name);
 const AssemblerInstruction *FindInstructionByOpcode (int instruction);
 
 bool CopyVariableValue (void *destination, void *source, size_t size);
-
-size_t GetHeaderSize ();
+char *convertToString ();
 
 #define CheckBuffer(spu)                                                                            \
             do {                                                                                    \
@@ -79,18 +76,29 @@ size_t GetHeaderSize ();
             }while (0)
 
 
-#define ReadData(spu, destination, type)                                            \
-        do {                                                                        \
-            char *bufferPointer = (spu)->bytecode->buffer + (spu)->ip;              \
-            custom_assert (bufferPointer, pointer_is_null, NO_BUFFER);              \
-            if ((ssize_t) (spu)->ip >= (spu)->bytecode->buffer_size) {              \
-                RETURN BUFFER_ENDED;                                                \
-            }                                                                       \
-            if (!CopyVariableValue (destination, bufferPointer, sizeof (type))) {   \
-                RETURN NO_BUFFER;                                                   \
-            }                                                                       \
-            (spu)->ip += sizeof (type);                                             \
-        }while (0)
+#define ReadData(spu, destination, type)                                                \
+            do {                                                                        \
+                char *bufferPointer = (spu)->bytecode->buffer + (spu)->ip;              \
+                custom_assert (bufferPointer, pointer_is_null, NO_BUFFER);              \
+                if ((ssize_t) (spu)->ip >= (spu)->bytecode->buffer_size) {              \
+                    RETURN BUFFER_ENDED;                                                \
+                }                                                                       \
+                if (!CopyVariableValue (destination, bufferPointer, sizeof (type))) {   \
+                    RETURN NO_BUFFER;                                                   \
+                }                                                                       \
+                (spu)->ip += sizeof (type);                                             \
+            }while (0)
+
+
+#define WriteHeaderField(buffer, header, field, fieldSize)                                                                  \
+            do {                                                                                                            \
+                WriteDataToBufferErrorCheck ("Error occuried while writing header field " #field " title to listing file",  \
+                                    buffer, "\t" #field ":  ", sizeof (#field ":  ") - 1);                                  \
+                WriteDataToBufferErrorCheck ("Error occuried while writing header field " #field " to listing file",        \
+                                    buffer, &(header)->field,   fieldSize);                                                 \
+                WriteDataToBufferErrorCheck ("Error occuried while writing new line " #field " to listing file",            \
+                                    buffer, "\n",              1);                                                          \
+            } while (0)
 
 
 #ifndef _NDEBUG
