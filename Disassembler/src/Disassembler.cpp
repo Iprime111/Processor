@@ -11,6 +11,7 @@
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 #include "SPU.h"
+#include "DSLFunctions.h"
 
 #include <cstdio>
 #include <cstdlib>

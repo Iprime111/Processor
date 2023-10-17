@@ -13,12 +13,13 @@ const char REGISTER_COUNT =
 
 #define REGISTER(...) 0,
 
+
 struct SPU {
     FileBuffer *bytecode;
     size_t ip = 0;
 
     Stack processorStack = {};
-    
+
     elem_t registerValues [REGISTER_COUNT] = {
         #include "Registers.def"
     };

@@ -21,5 +21,8 @@ out     ; compute and print D
 push rax+1
 out     ; compute and print a + 1
 
+jmp 0   ; jump test
+
 hlt     ; terminate program
+
 

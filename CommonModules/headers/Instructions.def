@@ -41,8 +41,6 @@ INSTRUCTION (in, {2 COMMA 0}, {
 }, {})
 
 INSTRUCTION (push, {3 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT}, {
-    CheckBuffer (spu);
-
     elem_t value = 0;
     unsigned char registerIndex = REGISTER_COUNT;
 
@@ -139,5 +137,13 @@ INSTRUCTION (sqrt, {11 COMMA 0}, {
 
     PushValue (spu, sqrt (value));
 }, {})
+
+INSTRUCTION (jmp, {12 COMMA IMMED_ARGUMENT}, {
+    unsigned long long jmpAddress = 0;
+    ReadData (spu, &jmpAddress, unsigned long long);
+
+
+    Jump (spu, jmpAddress);
+}, {JumpAssemblerCallback})
 
 #undef COMMA

@@ -9,33 +9,19 @@
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 #include "SPU.h"
+#include "DSLFunctions.h"
 
 #include <stdio.h>
 #include <string.h>
 
-#define PushValue(spu, value)                                                       \
-            do {                                                                    \
-                if (StackPush_ (&((spu)->processorStack), value) != NO_ERRORS) {    \
-                    PrintErrorMessage (STACK_ERROR, "Stack error occuried", NULL);  \
-                    RETURN STACK_ERROR;                                             \
-                }                                                                   \
-            }while (0)
-
-#define PopValue(spu, value)                                                        \
-            do {                                                                    \
-                if (StackPop_ (&((spu)->processorStack), value) != NO_ERRORS) {     \
-                    PrintErrorMessage (STACK_ERROR, "Stack error occuried", NULL);  \
-                    RETURN STACK_ERROR;                                             \
-                }                                                                   \
-            }while (0)
-
-#define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)                 \
-            INSTRUCTION_CALLBACK_FUNCTION (NAME) {                                              \
-                PushLog (3);                                                                    \
-                do                                                                              \
-                PROCESSOR_CALLBACK                                                              \
-                while (0);                                                                      \
-                RETURN NO_PROCESSOR_ERRORS;                                                     \
+#define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK) \
+            INSTRUCTION_CALLBACK_FUNCTION (NAME) {                              \
+                PushLog (3);                                                    \
+                CheckBuffer (spu);                                              \
+                do                                                              \
+                PROCESSOR_CALLBACK                                              \
+                while (0);                                                      \
+                RETURN NO_PROCESSOR_ERRORS;                                     \
             }
 
 static ProcessorErrorCode ReadInstruction (SPU *spu);

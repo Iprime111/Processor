@@ -10,6 +10,7 @@
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 #include "Buffer.h"
+#include "DSLFunctions.h"
 
 #include <cstdlib>
 #include <math.h>
@@ -334,6 +335,15 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
 
     #undef REGISTER
 
+    #define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK, ...)        \
+                if (instruction->commandCode.opcode == ((CommandCode) COMMAND_CODE).opcode)     \
+                    ASSEMBLER_CALLBACK                                                          \
+
+
+    #include "Instructions.def"
+
+    #undef INSTRUCTION
+
     RETURN NO_PROCESSOR_ERRORS;
 }
 
@@ -367,26 +377,17 @@ static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <
 
         #undef REGISTER
 
-        sprintf (message + strlen (message), "%s (size = %lu) ", registerName, sizeof (char));
+        ON_DEBUG (sprintf (message + strlen (message), "%s (size = %lu) ", registerName, sizeof (char)));
     }
 
     if (instruction->commandCode.arguments & IMMED_ARGUMENT) {
         WriteDataToBufferErrorCheck ("Error occuried while writing immed argument to binary buffer", binaryBuffer, &arguments->immedArgument, sizeof (elem_t));
 
-        sprintf (message + strlen (message), "%lf (size = %lu)", arguments->immedArgument, sizeof (elem_t));
+        ON_DEBUG (sprintf (message + strlen (message), "%lf (size = %lu)", arguments->immedArgument, sizeof (elem_t)));
     }
 
-    // check if message != "Arguments: "
+    // checking if message != "Arguments: "
     ON_DEBUG (if (message [12] != '\0'){ PrintInfoMessage (message, NULL);})
-
-    #define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)             \
-                if (instruction->commandCode.opcode == ((CommandCode) COMMAND_CODE).opcode)     \
-                    ASSEMBLER_CALLBACK                                                          \
-
-
-    #include "Instructions.def"
-
-    #undef INSTRUCTION
 
     RETURN NO_PROCESSOR_ERRORS;
 }
