@@ -2,8 +2,12 @@
 #define BUFFER_H_
 
 #include "CommonModules.h"
+#include "Logger.h"
 #include "MessageHandler.h"
+#include <cstdlib>
 #include <stddef.h>
+
+typedef long long comparator_t (void *, void *);
 
 template <typename T>
 struct Buffer {
@@ -47,7 +51,7 @@ ProcessorErrorCode InitBuffer (Buffer <T> *buffer, size_t capacity) {
 	custom_assert (buffer, pointer_is_null, NO_BUFFER);
 
 	buffer->capacity = capacity;
-	buffer->data = (char *) calloc (buffer->capacity, sizeof (T));
+	buffer->data = (T *) calloc (buffer->capacity, sizeof (T));
 
 	if (!buffer->data) {
 		ErrorFound (NO_BUFFER, "Error occuried while allocating buffer");
@@ -65,6 +69,23 @@ ProcessorErrorCode DestroyBuffer (Buffer <T> *buffer) {
 	free (buffer->data);
 
 	RETURN NO_PROCESSOR_ERRORS;
+}
+
+template <typename T>
+T *FindValueInBuffer (Buffer <T> *buffer, T *value, comparator_t *comparator) {
+	PushLog (3);
+
+	custom_assert (buffer, 	   pointer_is_null, NULL);
+	custom_assert (comparator, pointer_is_null, NULL);
+	custom_assert (value,      pointer_is_null, NULL);
+
+	for (size_t index = 0; index < buffer->currentIndex; index++) {
+		if (!comparator (buffer->data + index, value)) {
+			RETURN buffer->data + index;
+		}
+	}
+
+	RETURN NULL;
 }
 
 

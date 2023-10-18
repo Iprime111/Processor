@@ -139,11 +139,36 @@ INSTRUCTION (sqrt, {11 COMMA 0}, {
 }, {})
 
 INSTRUCTION (jmp, {12 COMMA IMMED_ARGUMENT}, {
-    unsigned long long jmpAddress = 0;
-    ReadData (spu, &jmpAddress, unsigned long long);
+    long long jmpAddress = 0;
+    ReadData (spu, &jmpAddress, long long);
 
 
     Jump (spu, jmpAddress);
 }, {JumpAssemblerCallback})
+
+INSTRUCTION (ja, {13 COMMA IMMED_ARGUMENT}, {
+    ConditionalJump (spu, GREATER);
+}, {JumpAssemblerCallback})
+
+INSTRUCTION (jae, {14 COMMA IMMED_ARGUMENT}, {
+    ConditionalJump (spu, GREATER | EQUAL);
+}, {JumpAssemblerCallback})
+
+INSTRUCTION (jb, {15 COMMA IMMED_ARGUMENT}, {
+    ConditionalJump (spu, LESS);
+}, {JumpAssemblerCallback})
+
+INSTRUCTION (jbe, {16 COMMA IMMED_ARGUMENT}, {
+    ConditionalJump (spu, LESS | EQUAL);
+}, {JumpAssemblerCallback})
+
+INSTRUCTION (je, {17 COMMA IMMED_ARGUMENT}, {
+    ConditionalJump (spu, EQUAL);
+}, {JumpAssemblerCallback})
+
+INSTRUCTION (jne, {18 COMMA IMMED_ARGUMENT}, {
+    ConditionalJump (spu, LESS | GREATER);
+}, {JumpAssemblerCallback})
+
 
 #undef COMMA

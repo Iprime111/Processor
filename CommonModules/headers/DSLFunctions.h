@@ -1,5 +1,27 @@
+#include "Buffer.h"
 #include "CommonModules.h"
+#include "Logger.h"
 #include "MessageHandler.h"
+#include <cmath>
+
+enum ComparisonResult {
+    GREATER   = 1 << 0,
+    LESS      = 1 << 1,
+    EQUAL     = 1 << 2,
+};
+
+const double EPS = 1e-5;
+
+inline ComparisonResult CompareValues (elem_t value1, elem_t value2) {
+    if (value1 - value2 > EPS) {
+        return GREATER;
+    } else if (value2 - value1 > EPS) {
+        return LESS;
+    }else {
+        return EQUAL;
+    }
+}
+
 #define CheckBuffer(spu)                                                                            \
             do {                                                                                    \
                 custom_assert ((spu)->bytecode,                   pointer_is_null, NO_BUFFER);      \
@@ -33,21 +55,45 @@
                 }                                                                           \
             }while (0)
 
-#define Jump(spu, jmpAddress)                                                   \
-            do {                                                                \
-                if ((ssize_t) jmpAddress >= (spu)->bytecode->buffer_size) {     \
-                    ErrorFound (BUFFER_ENDED, "Out of buffer jump attempt");    \
-                }                                                               \
-                (spu)->ip = jmpAddress + sizeof (Header);                       \
+#define Jump(spu, jmpAddress)                                                                   \
+            do {                                                                                \
+                if ((ssize_t) jmpAddress >= (spu)->bytecode->buffer_size || jmpAddress < 0) {   \
+                    ErrorFound (BUFFER_ENDED, "Out of buffer jump attempt");                    \
+                }                                                                               \
+                (spu)->ip = (size_t) jmpAddress + sizeof (Header);                              \
             } while (0)
 
 #define JumpAssemblerCallback                                                                                                   \
-    if (sscanf (line->pointer + offset, "%*s %llu", (unsigned long long *) &arguments->immedArgument) > 0) {                    \
-        ON_DEBUG (char message [128] = "");                                                                                     \
-        ON_DEBUG (sprintf (message, "Jump found. Jump address: %llu", *(unsigned long long *) &arguments->immedArgument));      \
+    char currentLabel [128] = "";                                                                                               \
+    ON_DEBUG (char message [128] = "");                                                                                         \
+    if (sscanf (line->pointer + offset, "%*s %lld", (long long *) &arguments->immedArgument) > 0) {                             \
+        isArgumentReadCorrectly = true;                                                                                         \
+    } else if (sscanf (line->pointer + offset, "%*s %s", currentLabel) > 0){                                                    \
+        Label label {};                                                                                                         \
+        InitLabel (&label, currentLabel, -1);                                                                                   \
+        Label *foundLabel = FindValueInBuffer (labelsBuffer, &label, LabelComparatorByName);                                    \
+        ON_DEBUG (sprintf (message, "Value found %p", foundLabel));                                                             \
         ON_DEBUG (PrintInfoMessage (message, NULL));                                                                            \
-    } else if (sscanf (line->pointer + offset, "%*s %s", (unsigned long long *) &arguments->immedArgument) > 0){                \
-        /*TODO labels*/                                                                                                         \
+        if (foundLabel) {                                                                                                       \
+            * (long long *) &arguments->immedArgument = foundLabel->address;                                                    \
+        }                                                                                                                       \
+        isArgumentReadCorrectly = true;                                                                                         \
     } else {                                                                                                                    \
         ErrorFound (TOO_FEW_ARGUMENTS, "Wrong arguments format");                                                               \
-    }
+    }                                                                                                                           \
+    ON_DEBUG (sprintf (message, "Jump found. Jump address: %lld", *(long long *) &arguments->immedArgument));                   \
+    ON_DEBUG (PrintInfoMessage (message, NULL));                                                                                \
+    instruction->commandCode.arguments = IMMED_ARGUMENT;
+
+#define ConditionalJump(spu, comparisonResult)                              \
+            do {                                                            \
+                elem_t value1 = NAN;                                        \
+                elem_t value2 = NAN;                                        \
+                PopValue (spu, &value1);                                    \
+                PopValue (spu, &value2);                                    \
+                long long jmpAddress = 0;                                   \
+                ReadData (spu, &jmpAddress, long long);                     \
+                if (CompareValues(value2, value1) & (comparisonResult)) {   \
+                    Jump (spu, jmpAddress);                                 \
+                }                                                           \
+            } while (0)

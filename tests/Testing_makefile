@@ -3,7 +3,7 @@
 default: all
 
 test-assembler:
-	@./bin/Assembler -s ../tests/test.asm -l ../tests/listing -o ../tests/test
+	@./bin/Assembler -s ../tests/test2.asm -l ../tests/listing -o ../tests/test
 
 test-disassembler: test-assembler
 	@./bin/Disassembler -b ../tests/test -o ../tests/test.disasm
