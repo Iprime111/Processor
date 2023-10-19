@@ -72,8 +72,6 @@ inline ComparisonResult CompareValues (elem_t value1, elem_t value2) {
         Label label {};                                                                                                         \
         InitLabel (&label, currentLabel, -1);                                                                                   \
         Label *foundLabel = FindValueInBuffer (labelsBuffer, &label, LabelComparatorByName);                                    \
-        ON_DEBUG (sprintf (message, "Value found %p", foundLabel));                                                             \
-        ON_DEBUG (PrintInfoMessage (message, NULL));                                                                            \
         if (foundLabel) {                                                                                                       \
             * (long long *) &arguments->immedArgument = foundLabel->address;                                                    \
         }                                                                                                                       \
@@ -84,6 +82,11 @@ inline ComparisonResult CompareValues (elem_t value1, elem_t value2) {
     ON_DEBUG (sprintf (message, "Jump found. Jump address: %lld", *(long long *) &arguments->immedArgument));                   \
     ON_DEBUG (PrintInfoMessage (message, NULL));                                                                                \
     instruction->commandCode.arguments = IMMED_ARGUMENT;
+
+#define JumpDisassemblerCallback                                            \
+    if (commandCode->arguments & IMMED_ARGUMENT) {                          \
+        sprintf (commandLine, " %lld\n", * (long long *) &immedArgument);   \
+    }
 
 #define ConditionalJump(spu, comparisonResult)                              \
             do {                                                            \

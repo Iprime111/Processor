@@ -22,11 +22,12 @@
 #include <sys/types.h>
 
 const size_t MAX_LABELS_COUNT = 128;
+const int COMPILATIONS_COUNT  = 2;
 
 static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer, TextLine *line);
 static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments);
 static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer);
-static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <char> *listingBiffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine);
+static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine);
 
 static ProcessorErrorCode WriteDataToFiles (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, int binaryDescriptor, int listingDescriptor);
 static ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescriptor);
@@ -49,18 +50,22 @@ ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryD
     Buffer <char>  listingBuffer {0, 0, NULL};
     Buffer <Label> labelsBuffer  {0, 0, NULL};
 
-    ON_DEBUG (PrintSuccessMessage ("Starting assembly...", NULL));
+    PrintSuccessMessage ("Starting assembly...", NULL);
 
     ErrorFound (CreateAssemblyBuffers (&binaryBuffer, &listingBuffer, &labelsBuffer, file, text), "Error occuried while creating file buffers");
 
     ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
+    for (int compilationNumber = 0; compilationNumber < COMPILATIONS_COUNT; compilationNumber++) {
+        binaryBuffer.currentIndex  = 0;
+        listingBuffer.currentIndex = 0;
 
-    for (size_t lineIndex = 0; lineIndex < text->line_count; lineIndex++) {
-        errorCode = CompileLine (&binaryBuffer, &listingBuffer, &labelsBuffer, text->lines + lineIndex);
+        for (size_t lineIndex = 0; lineIndex < text->line_count; lineIndex++) {
+            errorCode = CompileLine (&binaryBuffer, &listingBuffer, &labelsBuffer, text->lines + lineIndex);
 
-        if (!(errorCode & (BLANK_LINE)) && errorCode != NO_PROCESSOR_ERRORS) {
-            errorCode = (ProcessorErrorCode) (errorCode | DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer, &labelsBuffer));
-            ErrorFound (errorCode, "Compilation error");
+            if (!(errorCode & (BLANK_LINE)) && errorCode != NO_PROCESSOR_ERRORS) {
+                errorCode = (ProcessorErrorCode) (errorCode | DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer, &labelsBuffer));
+                ErrorFound (errorCode, "Compilation error");
+            }
         }
     }
 
@@ -93,12 +98,18 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
     char labelName [LABEL_NAME_LENGTH] = "";
     int labelNameLength = 0;
 
-    if (line->pointer [FindActualStringEnd (line) - 1] == ':' && sscanf (line->pointer, "%s%n", labelName, &labelNameLength) > 0) {
+    if (line->pointer [FindActualStringEnd (line)] == ':' && sscanf (line->pointer, "%s%n", labelName, &labelNameLength) > 0) {
         Label label {};
         labelName [labelNameLength - 1] = '\0';
         InitLabel (&label, labelName, (long long) binaryBuffer->currentIndex);
 
         WriteDataToBufferErrorCheck ("Error occuried while writing label to buffer", labelsBuffer, &label, 1);
+
+        const size_t ServiceInfoLength = 30;
+        char listingInfoBuffer [MAX_INSTRUCTION_LENGTH + ServiceInfoLength] = "";
+
+        sprintf (listingInfoBuffer, "%.4lu\t--\t\t%s\n", binaryBuffer->currentIndex, line->pointer + FindActualStringBegin (line));
+        WriteDataToBufferErrorCheck ("Error occuried while writing label to listing buffer", listingBuffer, listingInfoBuffer, strlen (listingInfoBuffer));
 
         RETURN NO_PROCESSOR_ERRORS;
     }
@@ -373,7 +384,7 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <char> *listingBiffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine) {
+static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine) {
     PushLog (3);
     custom_assert (instruction,        pointer_is_null, WRONG_INSTRUCTION);
     custom_assert (binaryBuffer,       pointer_is_null, WRONG_INSTRUCTION);
@@ -383,7 +394,7 @@ static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <
     char listingInfoBuffer [MAX_INSTRUCTION_LENGTH + ServiceInfoLength] = "";
 
     sprintf (listingInfoBuffer, "%.4lu\t%.2x\t\t%s\n", binaryBuffer->currentIndex, *(unsigned char *) &instruction->commandCode, sourceLine->pointer + FindActualStringBegin (sourceLine));
-    WriteDataToBufferErrorCheck ("Error occuried while writing instruction to listing buffer", listingBiffer, listingInfoBuffer, strlen (listingInfoBuffer));
+    WriteDataToBufferErrorCheck ("Error occuried while writing instruction to listing buffer", listingBuffer, listingInfoBuffer, strlen (listingInfoBuffer));
 
     WriteDataToBufferErrorCheck ("Error occuried while writing instruction to binary buffer", binaryBuffer, &instruction->commandCode, sizeof (CommandCode));
 
@@ -391,6 +402,8 @@ static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <
 
     if (instruction->commandCode.arguments & REGISTER_ARGUMENT) {
         WriteDataToBufferErrorCheck ("Error occuried while writing register number to binary buffer", binaryBuffer, &arguments->registerIndex, sizeof (char));
+
+        #ifndef _NDEBUG
 
         char *registerName = NULL;
 
@@ -403,7 +416,9 @@ static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <
 
         #undef REGISTER
 
-        ON_DEBUG (sprintf (message + strlen (message), "%s (size = %lu) ", registerName, sizeof (char)));
+        sprintf (message + strlen (message), "%s (size = %lu) ", registerName, sizeof (char));
+
+        #endif
     }
 
     if (instruction->commandCode.arguments & IMMED_ARGUMENT) {
@@ -454,7 +469,7 @@ static ssize_t CountWhitespaces (TextLine *line) {
 static ssize_t FindActualStringEnd (TextLine *line) {
     PushLog (3);
 
-    size_t length = line->length;
+    size_t length = line->length - 1;
 
     char *splitterPointer = strchr (line->pointer, ';');
     if (splitterPointer) {
@@ -474,9 +489,9 @@ static ssize_t FindActualStringBegin (TextLine *line) {
 
 // Instruction callback functions
 
-#define INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK)                       \
-            INSTRUCTION_CALLBACK_FUNCTION (NAME) {                                              \
-                return NO_PROCESSOR_ERRORS;                                                     \
+#define INSTRUCTION(NAME, OPCODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK, ...)  \
+            INSTRUCTION_CALLBACK_FUNCTION (NAME) {                              \
+                return NO_PROCESSOR_ERRORS;                                     \
             }
 
 #include "Instructions.def"

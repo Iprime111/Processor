@@ -11,18 +11,9 @@
 #include "SPU.h"
 #include "DSLFunctions.h"
 
+#include <cstddef>
 #include <stdio.h>
 #include <string.h>
-
-#define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK) \
-            INSTRUCTION_CALLBACK_FUNCTION (NAME) {                              \
-                PushLog (3);                                                    \
-                CheckBuffer (spu);                                              \
-                do                                                              \
-                PROCESSOR_CALLBACK                                              \
-                while (0);                                                      \
-                RETURN NO_PROCESSOR_ERRORS;                                     \
-            }
 
 static ProcessorErrorCode ReadInstruction (SPU *spu);
 static ProcessorErrorCode ReadHeader (SPU *spu);
@@ -33,9 +24,11 @@ ProcessorErrorCode ExecuteFile (SPU *spu) {
 
   	CheckBuffer (spu);
 
+	PrintSuccessMessage ("Reading header...", NULL);
 	ReadHeader (spu);
 
   	StackInitDefault_ (&spu->processorStack);
+	PrintSuccessMessage ("Starting execution...", NULL);
 
   	while (ReadInstruction (spu) == NO_PROCESSOR_ERRORS);
 
@@ -99,4 +92,17 @@ static ProcessorErrorCode ReadInstruction (SPU *spu) {
 
 // Processor instructions
 
+#define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ...) 	\
+            INSTRUCTION_CALLBACK_FUNCTION (NAME) {               	\
+                PushLog (3);                                     	\
+                CheckBuffer (spu);                               	\
+                do                                               	\
+                PROCESSOR_CALLBACK                               	\
+                while (0);                                       	\
+                RETURN NO_PROCESSOR_ERRORS;                      	\
+            }
+
+
 #include "Instructions.def"
+
+#undef INSTRUCTION

@@ -17,8 +17,8 @@ struct Label {
 
 ProcessorErrorCode InitLabel (Label *label, char *name, long long address);
 
-long long LabelComparator (void *value1, void *value2);
-long long LabelComparatorByName (void *value1, void *value2);
+long long LabelComparator          (void *value1, void *value2);
+long long LabelComparatorByName    (void *value1, void *value2);
 long long LabelComparatorByAddress (void *value1, void *value2);
 
 #endif

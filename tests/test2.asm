@@ -1,17 +1,24 @@
     in
-    pop rax
+    pop rax     ; Read value
 
 Begin:
     push rax
-    out
+    out         ; print current index
+
     push rax
     push 1
-    sub
+    sub         ; decrement index
 
     pop rax
-    push rax
-    push 0
+    push rax    ; save new index value
 
-    jae Begin
+    push 0
+    jae Begin   ; jump if positive
+
+    jmp Stop
+
+    out         ; Should not be triggered
+
+Stop:           ; end program
 
     hlt

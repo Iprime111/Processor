@@ -27,7 +27,7 @@ long long LabelComparator (void *value1, void *value2) {
         return addressDiff;
     }
 
-    return LabelComparatorByName (value1, value2);
+    RETURN LabelComparatorByName (value1, value2);
 }
 
 long long LabelComparatorByName (void *value1, void *value2) {
@@ -39,7 +39,7 @@ long long LabelComparatorByName (void *value1, void *value2) {
     Label *label1 = (Label *) value1;
     Label *label2 = (Label *) value2;
 
-    return strcmp (label1->name, label2->name);
+    RETURN strcmp (label1->name, label2->name);
 }
 
 long long LabelComparatorByAddress (void *value1, void *value2) {
@@ -53,6 +53,6 @@ long long LabelComparatorByAddress (void *value1, void *value2) {
 
     long long addressDiff = label1->address - label2->address;
 
-    return addressDiff;
+    RETURN addressDiff;
 }
 

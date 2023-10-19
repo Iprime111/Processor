@@ -36,10 +36,9 @@ ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
     Buffer <char> disassemblyBuffer {};
     Buffer <char> headerBuffer      {};
 
-    ON_DEBUG (PrintSuccessMessage ("Starting disassembly...", NULL));
-
     CreateDisassemblyBuffers (&disassemblyBuffer, &headerBuffer, spu);
 
+    PrintSuccessMessage ("Reading header...", NULL);
     ProcessorErrorCode errorCode = ReadHeader (&headerBuffer, spu);
 
     if (errorCode != NO_PROCESSOR_ERRORS) {
@@ -47,8 +46,8 @@ ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
         ErrorFound (errorCode, "Invalid header readed");
     }
 
+    PrintSuccessMessage ("Starting disassembly...", NULL);
     while ((errorCode = ReadInstruction (&disassemblyBuffer, spu)) == NO_PROCESSOR_ERRORS);
-
     if (errorCode != BUFFER_ENDED) {
         errorCode = (ProcessorErrorCode) (DestroyDisassemblyBuffers (&disassemblyBuffer, &headerBuffer) | errorCode);
         ErrorFound (errorCode, "Disassembly error occuried");
@@ -61,7 +60,7 @@ ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
 
     ErrorFound (DestroyDisassemblyBuffers (&disassemblyBuffer, &headerBuffer), "Error occuried while destroying assembly buffers");
 
-    ON_DEBUG (PrintSuccessMessage ("Disassembly finished successfully!", NULL));
+    PrintSuccessMessage ("Disassembly finished successfully!", NULL);
     RETURN NO_PROCESSOR_ERRORS;
 }
 
@@ -256,12 +255,21 @@ static ProcessorErrorCode ReadArguments (const AssemblerInstruction *instruction
 
     #undef REGISTER
 
+    #define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK, DISASSEMBLER_CALLBACK)  \
+    if (instruction->commandCode.opcode == ((CommandCode) COMMAND_CODE).opcode) {                           \
+        DISASSEMBLER_CALLBACK                                                                               \
+    }
+
+    #include "Instructions.def"
+
+    #undef INSTRUCTION
+
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-#define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK) \
-            INSTRUCTION_CALLBACK_FUNCTION (NAME) {                              \
-                return NO_PROCESSOR_ERRORS;                                     \
+#define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK, DISASSEMBLER_CALLBACK)  \
+            INSTRUCTION_CALLBACK_FUNCTION (NAME) {                                                      \
+                return NO_PROCESSOR_ERRORS;                                                             \
             }
 
 #include "Instructions.def"

@@ -72,6 +72,8 @@ void AddSource (char **arguments) {
     if (IsRegularFile (arguments [0])) {
         SourceFile = arguments [0];
     }
+
+    RETURN;
 }
 
 void AddBinary (char **arguments) {
