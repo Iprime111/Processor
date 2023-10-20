@@ -18,6 +18,7 @@ add_subdirectory (CommonModules)
 add_subdirectory (SoftProcessor)
 add_subdirectory (Assembler)
 add_subdirectory (Disassembler)
+add_subdirectory (GraphicsProvider)
 
 set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set (CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)

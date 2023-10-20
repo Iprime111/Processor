@@ -15,7 +15,7 @@ Begin:
     push 0
     jae Begin   ; jump if positive
 
-    jmp Stop
+    jmp [rax]
 
     out         ; Should not be triggered
 

@@ -12,10 +12,13 @@
 #include <cstddef>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
-static char *BinaryFile = NULL;
+static char      *BinaryFile    = NULL;
+static useconds_t FrequencyTime = 0;
 
 void AddBinary (char **arguments);
+void SetFrequency (char **arguments);
 
 static bool PrepareForExecuting (FileBuffer *fileBuffer);
 
@@ -25,7 +28,8 @@ int main (int argc, char **argv){
     SetGlobalMessagePrefix ("Processor");
 
     //Process console line arguments
-    register_flag ("-b", "--binary", AddBinary, 1);
+    register_flag ("-b", "--binary",    AddBinary,    1);
+    register_flag ("-f", "--frequency", SetFrequency, 1);
     parse_flags (argc, argv);
 
     //Read binary file
@@ -34,6 +38,7 @@ int main (int argc, char **argv){
     if (PrepareForExecuting (&fileBuffer)){
         SPU spu {
             .bytecode = &fileBuffer,
+            .frequencySleep = FrequencyTime,
         };
 
         ExecuteFile (&spu);
@@ -76,6 +81,22 @@ void AddBinary (char **arguments) {
     }
 
     BinaryFile = arguments [0];
+
+    RETURN;
+}
+
+void SetFrequency (char **arguments) {
+    PushLog (3);
+
+    unsigned int frequency = (unsigned int) atol (arguments [0]);
+
+    if (frequency < MIN_FREQUENCY || frequency > MAX_FREQUENCY) {
+        PrintWarningMessage (WRONG_FREQUENCY, "Bad frequency number. Setting frequency to maximum limit.", NULL, -1);
+
+        frequency = MAX_FREQUENCY;
+    }
+
+    FrequencyTime = MAX_SLEEP_TIME - MAX_SLEEP_TIME * (frequency / MAX_FREQUENCY);
 
     RETURN;
 }

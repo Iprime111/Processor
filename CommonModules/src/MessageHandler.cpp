@@ -66,6 +66,7 @@ static void PrintError (FILE *stream, ProcessorErrorCode errorCode, CONSOLE_COLO
     MSG_ (errorCode, NO_PROCESSOR,       "No available processor has been found");
     MSG_ (errorCode, WRONG_HEADER,       "Header has wrong format");
     MSG_ (errorCode, WRONG_LABEL,        "Label do not exist");
+    MSG_ (errorCode, WRONG_FREQUENCY,    "Frequency is out of bounds");
 
     #undef MSG_
 

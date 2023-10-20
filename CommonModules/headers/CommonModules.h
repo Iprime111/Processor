@@ -28,6 +28,7 @@ enum ProcessorErrorCode {
     NO_PROCESSOR        = 1 << 11,
     WRONG_HEADER        = 1 << 12,
     WRONG_LABEL         = 1 << 13,
+    WRONG_FREQUENCY     = 1 << 14,
 };
 
 enum ArgumentsType {

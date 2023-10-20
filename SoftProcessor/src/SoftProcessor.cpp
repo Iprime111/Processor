@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 static ProcessorErrorCode ReadInstruction (SPU *spu);
 static ProcessorErrorCode ReadHeader (SPU *spu);
@@ -51,8 +52,8 @@ static ProcessorErrorCode ReadHeader (SPU *spu) {
 
     ReadData (spu, &readedHeader, Header);
 
-    #define CheckHeaderField(field, predicate)                                      \
-                if (!(predicate)) {                                                 \
+    #define CheckHeaderField(field, predicate)                                      	     \
+                if (!(predicate)) {                                                 	     \
                     ErrorFoundInProgram (WRONG_HEADER, "Header field " #field " is wrong");  \
                 }
 
@@ -124,6 +125,8 @@ static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *in
 	}
 
 	if (commandCode->arguments & MEMORY_ARGUMENT) {
+		usleep (spu->frequencySleep);
+
 		*argumentPointer = (spu->ram + (ssize_t) **argumentPointer);
 	}
 
