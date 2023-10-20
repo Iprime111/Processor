@@ -52,12 +52,12 @@ static bool PrepareForExecuting (FileBuffer *fileBuffer) {
     }
 
     if (!CreateFileBuffer (fileBuffer, BinaryFile)) {
-        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while creating binary file buffer", NULL);
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while creating binary file buffer", NULL, -1);
         RETURN false;
     }
 
     if (!ReadFile (BinaryFile, fileBuffer)) {
-        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while reading binary", NULL);
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while reading binary", NULL, -1);
         RETURN false;
     }
 
@@ -71,7 +71,7 @@ void AddBinary (char **arguments) {
     custom_assert (arguments [0], pointer_is_null, (void)0);
 
     if (!IsRegularFile (arguments [0])){
-        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while adding binary file - not a regular file", NULL);
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while adding binary file - not a regular file", NULL, -1);
         RETURN;
     }
 

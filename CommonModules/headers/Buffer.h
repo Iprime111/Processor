@@ -22,7 +22,7 @@ struct Buffer {
 				ProcessorErrorCode _errorCode = NO_PROCESSOR_ERRORS;															\
         		if ((_errorCode = WriteDataToBuffer (buffer, data, dataSize)) != NO_PROCESSOR_ERRORS) {                         \
         		    DestroyBuffer (buffer);                                                                                     \
-        		    ErrorFound (_errorCode, errorMessage);                                                                      \
+        		    ErrorFoundInProgram (_errorCode, errorMessage);                                                             \
         		}																												\
 			} while (0)
 
@@ -34,7 +34,7 @@ ProcessorErrorCode WriteDataToBuffer (Buffer <T> *buffer, const void *data, size
   	custom_assert (data,   pointer_is_null, NO_BUFFER);
 
   	if (dataSize > buffer->capacity - buffer->currentIndex) {
-    	ErrorFound (BUFFER_ENDED, "Too many data to write into the buffer");
+    	ErrorFoundInProgram (BUFFER_ENDED, "Too many data to write into the buffer");
   	}
 
   	for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++) {
@@ -54,7 +54,7 @@ ProcessorErrorCode InitBuffer (Buffer <T> *buffer, size_t capacity) {
 	buffer->data = (T *) calloc (buffer->capacity, sizeof (T));
 
 	if (!buffer->data) {
-		ErrorFound (NO_BUFFER, "Error occuried while allocating buffer");
+		ErrorFoundInProgram (NO_BUFFER, "Error occuried while allocating buffer");
 	}
 
 	RETURN NO_PROCESSOR_ERRORS;

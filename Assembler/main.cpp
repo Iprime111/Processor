@@ -52,7 +52,7 @@ int main (int argc, char **argv) {
 
         if (errorCode != NO_PROCESSOR_ERRORS) {
             if (remove (BinaryFile)) {
-                PrintErrorMessage (OUTPUT_FILE_ERROR, "Unable to delete corrupted binary file", NULL);
+                PrintErrorMessage (OUTPUT_FILE_ERROR, "Unable to delete corrupted binary file", NULL, -1);
             }
         }
     }
@@ -106,33 +106,33 @@ static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer
     }
 
     if (!CreateFileBuffer (fileBuffer, SourceFile)) {
-        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while creating file buffer", NULL);
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while creating file buffer", NULL, -1);
         RETURN false;
     }
 
     if (!ReadFileLines (SourceFile, fileBuffer, textBuffer)) {
-        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while reading file lines", NULL);
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while reading file lines", NULL, -1);
         RETURN false;
     }
 
     if (!ChangeNewLinesToZeroes (textBuffer)) {
-        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while changing new line symbols to zero symbols", NULL);
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while changing new line symbols to zero symbols", NULL, -1);
         RETURN false;
     }
 
     if ((*binaryDescriptor = OpenFileWrite (BinaryFile)) == -1) {
-            PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while opening binary file", NULL);
+            PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while opening binary file", NULL, -1);
             RETURN false;
         }
 
     if (ListingFile) {
         if ((*listingDescriptor = OpenFileWrite (ListingFile)) == -1) {
-            PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while opening listing file", NULL);
+            PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while opening listing file", NULL, -1);
             RETURN false;
         }
     }else {
         *listingDescriptor = -1;
-        PrintWarningMessage (OUTPUT_FILE_ERROR, "Lising file is not specified", NULL);
+        PrintWarningMessage (OUTPUT_FILE_ERROR, "Lising file is not specified", NULL, -1);
     }
 
 

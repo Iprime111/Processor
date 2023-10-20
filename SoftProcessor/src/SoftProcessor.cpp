@@ -50,7 +50,7 @@ static ProcessorErrorCode ReadHeader (SPU *spu) {
 
     #define CheckHeaderField(field, predicate)                                      \
                 if (!(predicate)) {                                                 \
-                    ErrorFound (WRONG_HEADER, "Header field " #field " is wrong");  \
+                    ErrorFoundInProgram (WRONG_HEADER, "Header field " #field " is wrong");  \
                 }
 
     CheckHeaderField (SIGNATURE,  readedHeader.signature == mainHeader.signature);
@@ -73,11 +73,11 @@ static ProcessorErrorCode ReadInstruction (SPU *spu) {
 	const AssemblerInstruction *instruction = FindInstructionByOpcode (commandCode.opcode);
 
 	if (instruction == NULL) {
-		ErrorFound (WRONG_INSTRUCTION, "Wrong instruction readed");
+		ErrorFoundInProgram (WRONG_INSTRUCTION, "Wrong instruction readed");
 	}
 
 	if ((~instruction->commandCode.arguments) & commandCode.arguments) {
-		ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
+		ErrorFoundInProgram (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
 	}
 
 	#ifndef _NDEBUG

@@ -44,21 +44,21 @@ inline ComparisonResult CompareValues (elem_t value1, elem_t value2) {
 #define PushValue(spu, value)                                                               \
             do {                                                                            \
                 if (StackPush_ (&((spu)->processorStack), value) != NO_ERRORS) {            \
-                    ErrorFound (STACK_ERROR, "Stack error occuried while pushing value");   \
+                    ErrorFoundInProgram (STACK_ERROR, "Stack error occuried while pushing value");   \
                 }                                                                           \
             }while (0)
 
 #define PopValue(spu, value)                                                                \
             do {                                                                            \
                 if (StackPop_ (&((spu)->processorStack), value) != NO_ERRORS) {             \
-                    ErrorFound (STACK_ERROR, "Stack error occuried while poping value");    \
+                    ErrorFoundInProgram (STACK_ERROR, "Stack error occuried while poping value");    \
                 }                                                                           \
             }while (0)
 
 #define Jump(spu, jmpAddress)                                                                   \
             do {                                                                                \
                 if ((ssize_t) jmpAddress >= (spu)->bytecode->buffer_size || jmpAddress < 0) {   \
-                    ErrorFound (BUFFER_ENDED, "Out of buffer jump attempt");                    \
+                    ErrorFoundInProgram (BUFFER_ENDED, "Out of buffer jump attempt");                    \
                 }                                                                               \
                 (spu)->ip = (size_t) jmpAddress + sizeof (Header);                              \
             } while (0)
@@ -77,7 +77,7 @@ inline ComparisonResult CompareValues (elem_t value1, elem_t value2) {
         }                                                                                                                       \
         isArgumentReadCorrectly = true;                                                                                         \
     } else {                                                                                                                    \
-        ErrorFound (TOO_FEW_ARGUMENTS, "Wrong arguments format");                                                               \
+        ErrorFound (TOO_FEW_ARGUMENTS, "Wrong arguments format", lineNumber);                                                   \
     }                                                                                                                           \
     ON_DEBUG (sprintf (message, "Jump found. Jump address: %lld", *(long long *) &arguments->immedArgument));                   \
     ON_DEBUG (PrintInfoMessage (message, NULL));                                                                                \

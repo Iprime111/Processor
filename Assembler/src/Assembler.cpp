@@ -13,6 +13,7 @@
 #include "DSLFunctions.h"
 #include <Label.h>
 
+#include <cstddef>
 #include <cstdlib>
 #include <math.h>
 #include <stdlib.h>
@@ -24,9 +25,9 @@
 const size_t MAX_LABELS_COUNT = 128;
 const int COMPILATIONS_COUNT  = 2;
 
-static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer, TextLine *line);
-static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments);
-static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer);
+static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer, TextLine *line, int lineNumber);
+static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int lineNumber);
+static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer, int lineNumber);
 static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine);
 
 static ProcessorErrorCode WriteDataToFiles (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, int binaryDescriptor, int listingDescriptor);
@@ -52,7 +53,7 @@ ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryD
 
     PrintSuccessMessage ("Starting assembly...", NULL);
 
-    ErrorFound (CreateAssemblyBuffers (&binaryBuffer, &listingBuffer, &labelsBuffer, file, text), "Error occuried while creating file buffers");
+    ErrorFoundInProgram (CreateAssemblyBuffers (&binaryBuffer, &listingBuffer, &labelsBuffer, file, text), "Error occuried while creating file buffers");
 
     ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
     for (int compilationNumber = 0; compilationNumber < COMPILATIONS_COUNT; compilationNumber++) {
@@ -60,11 +61,11 @@ ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryD
         listingBuffer.currentIndex = 0;
 
         for (size_t lineIndex = 0; lineIndex < text->line_count; lineIndex++) {
-            errorCode = CompileLine (&binaryBuffer, &listingBuffer, &labelsBuffer, text->lines + lineIndex);
+            errorCode = CompileLine (&binaryBuffer, &listingBuffer, &labelsBuffer, text->lines + lineIndex, (int) lineIndex + 1);
 
             if (!(errorCode & (BLANK_LINE)) && errorCode != NO_PROCESSOR_ERRORS) {
                 errorCode = (ProcessorErrorCode) (errorCode | DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer, &labelsBuffer));
-                ErrorFound (errorCode, "Compilation error");
+                ErrorFound (errorCode, "Compilation error", (int) lineIndex + 1);
             }
         }
     }
@@ -73,16 +74,16 @@ ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryD
 
     if (errorCode != NO_PROCESSOR_ERRORS) {
         errorCode = (ProcessorErrorCode) (errorCode | DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer, &labelsBuffer));
-        ErrorFound (errorCode, "Error occuried while writing data to output file");
+        ErrorFoundInProgram (errorCode, "Error occuried while writing data to output file");
     }
 
-    ErrorFound (DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer, &labelsBuffer), "Error occuried while destroying assembly buffers");
+    ErrorFoundInProgram (DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer, &labelsBuffer), "Error occuried while destroying assembly buffers");
 
     PrintSuccessMessage ("Assembly finished successfully!", NULL);
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer, TextLine *line) {
+static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer, TextLine *line, int lineNumber) {
     PushLog (2);
 
     custom_assert (line,          pointer_is_null, NO_BUFFER);
@@ -120,7 +121,7 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
     ArgumentsType permittedArguments = NO_ARGUMENTS;
     AssemblerInstruction outputInstruction {"", {0, 0}, NULL};
 
-    if ((errorCode = GetInstructionOpcode (line, &outputInstruction, &permittedArguments)) != NO_PROCESSOR_ERRORS) {
+    if ((errorCode = GetInstructionOpcode (line, &outputInstruction, &permittedArguments, lineNumber)) != NO_PROCESSOR_ERRORS) {
         RETURN errorCode;
     }
 
@@ -130,7 +131,7 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
         PrintInfoMessage (message, NULL);
     #endif
 
-    if ((errorCode = GetInstructionArgumentsData (&outputInstruction, line, &arguments, permittedArguments, labelsBuffer)) != NO_PROCESSOR_ERRORS) {
+    if ((errorCode = GetInstructionArgumentsData (&outputInstruction, line, &arguments, permittedArguments, labelsBuffer, lineNumber)) != NO_PROCESSOR_ERRORS) {
         RETURN errorCode;
     }
 
@@ -152,7 +153,7 @@ static ProcessorErrorCode CreateAssemblyBuffers (Buffer <char> *binaryBuffer, Bu
     // max allocation coefficient = 9 / 4 = 2.25 ---> coef = 3
     const size_t MaxBinaryAllocationCoefficient = 3;
 
-    ErrorFound (InitBuffer (binaryBuffer, (size_t) sourceFile->buffer_size * MaxBinaryAllocationCoefficient), "Unable to create binary file buffer");
+    ErrorFoundInProgram (InitBuffer (binaryBuffer, (size_t) sourceFile->buffer_size * MaxBinaryAllocationCoefficient), "Unable to create binary file buffer");
 
     //Listing format:
     // ip   opcode  line
@@ -167,11 +168,11 @@ static ProcessorErrorCode CreateAssemblyBuffers (Buffer <char> *binaryBuffer, Bu
 
     const size_t MaxHeaderAllocationCoefficient = 2;
 
-    ErrorFound (InitBuffer (listingBuffer, listingAllocationSize + sizeof (Header) * MaxHeaderAllocationCoefficient), "Unable to create listing file buffer");
+    ErrorFoundInProgram (InitBuffer (listingBuffer, listingAllocationSize + sizeof (Header) * MaxHeaderAllocationCoefficient), "Unable to create listing file buffer");
 
     // Allocating labels buffer
 
-    ErrorFound (InitBuffer (labelsBuffer, MAX_LABELS_COUNT), "Unable to create labels buffer");
+    ErrorFoundInProgram (InitBuffer (labelsBuffer, MAX_LABELS_COUNT), "Unable to create labels buffer");
 
     RETURN NO_PROCESSOR_ERRORS;
 }
@@ -197,21 +198,21 @@ static ProcessorErrorCode WriteDataToFiles (Buffer <char> *binaryBuffer, Buffer 
     custom_assert (listingBuffer,          pointer_is_null,   NO_BUFFER);
     custom_assert (binaryDescriptor != -1, invalid_arguments, OUTPUT_FILE_ERROR);
 
-    ErrorFound (WriteHeader (binaryDescriptor, listingDescriptor), "Error occuried while writing header");
+    ErrorFoundInProgram (WriteHeader (binaryDescriptor, listingDescriptor), "Error occuried while writing header");
 
     if (!WriteBuffer (binaryDescriptor, binaryBuffer->data, (ssize_t) binaryBuffer->currentIndex)) {
-        ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing to binary file");
+        ErrorFoundInProgram (OUTPUT_FILE_ERROR, "Error occuried while writing to binary file");
     }
 
     if (listingDescriptor != -1) {
         const char *ListingLegend = " ip \topcode\tsource\n";
 
         if (!WriteBuffer (listingDescriptor, ListingLegend, (ssize_t) strlen (ListingLegend))) {
-            ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing to listing file");
+            ErrorFoundInProgram (OUTPUT_FILE_ERROR, "Error occuried while writing to listing file");
         }
 
         if (!WriteBuffer (listingDescriptor, listingBuffer->data, (ssize_t) listingBuffer->currentIndex)) {
-            ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing to listing file");
+            ErrorFoundInProgram (OUTPUT_FILE_ERROR, "Error occuried while writing to listing file");
         }
     }
 
@@ -226,14 +227,14 @@ static ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescript
     InitHeader (&header);
 
     if (!WriteBuffer (binaryDescriptor, (char *) &header, sizeof (header))) {
-        ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing header to binary file");
+        ErrorFoundInProgram (OUTPUT_FILE_ERROR, "Error occuried while writing header to binary file");
     }
 
     if (listingDescriptor != -1) {
         const char HeaderLegend [] = "HEADER:\n";
 
         if (!WriteBuffer (listingDescriptor, HeaderLegend, (ssize_t) sizeof (HeaderLegend) - 1)) {
-            ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing header to listing file");
+            ErrorFoundInProgram (OUTPUT_FILE_ERROR, "Error occuried while writing header to listing file");
         }
 
         Buffer <char> listingHeaderBuffer {};
@@ -246,7 +247,7 @@ static ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescript
         WriteDataToBufferErrorCheck ("Error occuried while writing new line to listing file", &listingHeaderBuffer, "\n\n", 2);
 
         if (!WriteBuffer (listingDescriptor, listingHeaderBuffer.data, (ssize_t) listingHeaderBuffer.currentIndex)) {
-            ErrorFound (OUTPUT_FILE_ERROR, "Error occuried while writing header to listing file");
+            ErrorFoundInProgram (OUTPUT_FILE_ERROR, "Error occuried while writing header to listing file");
         }
 
         DestroyBuffer (&listingHeaderBuffer);
@@ -255,7 +256,7 @@ static ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescript
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments) {
+static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int lineNumber) {
     PushLog (3);
 
     custom_assert (instruction, pointer_is_null, WRONG_INSTRUCTION);
@@ -276,7 +277,7 @@ static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruc
     const AssemblerInstruction *constInstruction = FindInstructionByName (sscanfBuffer);
 
     if (!constInstruction) {
-        ErrorFound (WRONG_INSTRUCTION, "Wrong instruction has been read");
+        ErrorFound (WRONG_INSTRUCTION, "Wrong instruction has been read", lineNumber);
     }
 
     instruction->instructionName = constInstruction->instructionName;
@@ -288,7 +289,7 @@ static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruc
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer) {
+static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer, int lineNumber) {
     PushLog (3);
     custom_assert (line,        pointer_is_null, NO_BUFFER);
     custom_assert (instruction, pointer_is_null, WRONG_INSTRUCTION);
@@ -317,7 +318,7 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
     switch (argumentsCount) {
         case 2:
             if (permittedArguments != (REGISTER_ARGUMENT | IMMED_ARGUMENT)) {
-                ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
+                ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments", lineNumber);
             }
 
             if (sscanf (line->pointer + offset, "%*s %3s+%lf", registerNameBuffer, &arguments->immedArgument) > 0) {
@@ -326,9 +327,9 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
 
                 #include "Registers.def"
 
-                ErrorFound (TOO_FEW_ARGUMENTS, "Wrong register name format");
+                ErrorFound (TOO_FEW_ARGUMENTS, "Wrong register name format", lineNumber);
             }else {
-                ErrorFound (TOO_FEW_ARGUMENTS, "Wrong arguments format");
+                ErrorFound (TOO_FEW_ARGUMENTS, "Wrong arguments format", lineNumber);
             }
             break;
 
@@ -339,7 +340,7 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
         case 1:
             if (sscanf (line->pointer + offset, "%*s %lf", &arguments->immedArgument) > 0){
                 if (!(permittedArguments & IMMED_ARGUMENT)) {
-                    ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
+                    ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments", lineNumber);
                 }
                 instruction->commandCode.arguments = IMMED_ARGUMENT;
 
@@ -353,16 +354,16 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
 
                 #include "Registers.def"
 
-                ErrorFound (TOO_FEW_ARGUMENTS, "Wrong register name format");
+                ErrorFound (TOO_FEW_ARGUMENTS, "Wrong register name format", lineNumber);
             }else {
-                ErrorFound (TOO_FEW_ARGUMENTS, "Wrong arguments format");
+                ErrorFound (TOO_FEW_ARGUMENTS, "Wrong arguments format", lineNumber);
             }
 
             isArgumentReadCorrectly = true;
             break;
 
         default:
-            ErrorFound (TOO_MANY_ARGUMENTS, "Too many arguments for this command");
+            ErrorFound (TOO_MANY_ARGUMENTS, "Too many arguments for this command", lineNumber);
             break;
     }
 
@@ -378,7 +379,7 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
     #undef INSTRUCTION
 
     if (!isArgumentReadCorrectly) {
-        ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
+        ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments", lineNumber);
     }
 
     RETURN NO_PROCESSOR_ERRORS;

@@ -13,7 +13,7 @@ static CONSOLE_COLOR GetMessageColor (MessageType type);
 
 static void PrintPrefix      (FILE *stream, const char *prefix,           CONSOLE_COLOR color);
 static void PrintMessageText (FILE *stream, const char *text,             CONSOLE_COLOR color);
-static void PrintError       (FILE *stream, ProcessorErrorCode errorCode, CONSOLE_COLOR color);
+static void PrintError       (FILE *stream, ProcessorErrorCode errorCode, CONSOLE_COLOR color, ProcessorMessage *message);
 
 ProcessorErrorCode PrintMessage (FILE *stream, ProcessorMessage message) {
     PushLog (4);
@@ -22,7 +22,7 @@ ProcessorErrorCode PrintMessage (FILE *stream, ProcessorMessage message) {
 
     PrintPrefix      (stream, message.prefix,    messageColor);
     PrintMessageText (stream, message.text,      CONSOLE_WHITE);
-    PrintError       (stream, message.errorCode, messageColor);
+    PrintError       (stream, message.errorCode, messageColor,  &message);
 
     fputs ("\n", stream);
 
@@ -33,8 +33,7 @@ void SetGlobalMessagePrefix (char *newPrefix) {
     GlobalPrefix = newPrefix;
 }
 
-// TODO print error line
-static void PrintError (FILE *stream, ProcessorErrorCode errorCode, CONSOLE_COLOR color) {
+static void PrintError (FILE *stream, ProcessorErrorCode errorCode, CONSOLE_COLOR color, ProcessorMessage *message) {
     PushLog (4);
 
     if (errorCode == NO_PROCESSOR_ERRORS) {
@@ -42,6 +41,13 @@ static void PrintError (FILE *stream, ProcessorErrorCode errorCode, CONSOLE_COLO
     }
 
     fprintf_color (color, CONSOLE_NORMAL, stream, "(");
+    ON_DEBUG (fprintf_color (color, CONSOLE_BOLD, stream, "%s:%d in <%s>. ", message->file, message->line, message->function));
+
+    if (message->asmLine >= 0) {
+        fprintf_color (CONSOLE_WHITE, CONSOLE_BOLD, stream, "Source line %d. ", message->asmLine);
+    }
+
+    fprintf_color (color, CONSOLE_NORMAL, stream, "Errors codes:");
 
     #define MSG_(errorCode, patternCode, message)                                                   \
                 if (errorCode & patternCode) {                                                      \

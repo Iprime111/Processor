@@ -44,7 +44,7 @@ int main (int argc, char **argv){
 
         if (errorCode != NO_PROCESSOR_ERRORS) {
             if (remove (OutFile)) {
-                PrintErrorMessage (OUTPUT_FILE_ERROR, "Unable to delete corrupted disassembly file", NULL);
+                PrintErrorMessage (OUTPUT_FILE_ERROR, "Unable to delete corrupted disassembly file", NULL, -1);
             }
         }
     }
@@ -59,22 +59,22 @@ static bool PrepareForDisassembling (FileBuffer *fileBuffer, int *outFileDescrip
     PushLog (2);
 
     if (!BinaryFile) {
-        PrintErrorMessage (INPUT_FILE_ERROR, "No binary has been specified", NULL);
+        PrintErrorMessage (INPUT_FILE_ERROR, "No binary has been specified", NULL, -1);
         RETURN false;
     }
 
     if (!CreateFileBuffer (fileBuffer, BinaryFile)) {
-        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while creating binary file buffer", NULL);
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while creating binary file buffer", NULL, -1);
         RETURN false;
     }
 
     if (!ReadFile (BinaryFile, fileBuffer)) {
-        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while reading binary", NULL);
+        PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while reading binary", NULL, -1);
         RETURN false;
     }
 
     if ((*outFileDescriptor = OpenFileWrite (OutFile)) == -1) {
-        PrintErrorMessage (OUTPUT_FILE_ERROR, "Error occuried while opening disassembly file", NULL);
+        PrintErrorMessage (OUTPUT_FILE_ERROR, "Error occuried while opening disassembly file", NULL, -1);
         RETURN false;
     }
 
@@ -88,7 +88,7 @@ void AddBinary (char **arguments) {
     custom_assert (arguments [0], pointer_is_null, (void)0);
 
     if (!IsRegularFile (arguments [0])){
-        PrintErrorMessage (TOO_FEW_ARGUMENTS, "Error occuried while adding binary file - not a regular file", NULL);
+        PrintErrorMessage (TOO_FEW_ARGUMENTS, "Error occuried while adding binary file - not a regular file", NULL, -1);
         RETURN;
     }
 
