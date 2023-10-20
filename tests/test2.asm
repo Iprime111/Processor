@@ -19,7 +19,6 @@ Begin:
 
     out         ; Should not be triggered
 
-hui
 
 Stop:           ; end program
 

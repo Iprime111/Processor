@@ -28,7 +28,9 @@ const int COMPILATIONS_COUNT  = 2;
 static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer, TextLine *line, int lineNumber);
 static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int lineNumber);
 static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer, int lineNumber);
-static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine);
+
+static ProcessorErrorCode EmitLabel       (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer, TextLine *sourceLine, char *labelName, int labelNameLength, int lineNumber);
+static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine,    int lineNumber);
 
 static ProcessorErrorCode WriteDataToFiles (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, int binaryDescriptor, int listingDescriptor);
 static ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescriptor);
@@ -100,19 +102,9 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
     int labelNameLength = 0;
 
     if (line->pointer [FindActualStringEnd (line)] == ':' && sscanf (line->pointer, "%s%n", labelName, &labelNameLength) > 0) {
-        Label label {};
-        labelName [labelNameLength - 1] = '\0';
-        InitLabel (&label, labelName, (long long) binaryBuffer->currentIndex);
 
-        WriteDataToBufferErrorCheck ("Error occuried while writing label to buffer", labelsBuffer, &label, 1);
 
-        const size_t ServiceInfoLength = 30;
-        char listingInfoBuffer [MAX_INSTRUCTION_LENGTH + ServiceInfoLength] = "";
-
-        sprintf (listingInfoBuffer, "%.4lu\t--\t\t%s\n", binaryBuffer->currentIndex, line->pointer + FindActualStringBegin (line));
-        WriteDataToBufferErrorCheck ("Error occuried while writing label to listing buffer", listingBuffer, listingInfoBuffer, strlen (listingInfoBuffer));
-
-        RETURN NO_PROCESSOR_ERRORS;
+        RETURN EmitLabel (binaryBuffer, listingBuffer, labelsBuffer, line, labelName, labelNameLength, lineNumber);
     }
 
     ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
@@ -135,7 +127,7 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
         RETURN errorCode;
     }
 
-    RETURN EmitInstruction (binaryBuffer, listingBuffer, &outputInstruction, &arguments, line);
+    RETURN EmitInstruction (binaryBuffer, listingBuffer, &outputInstruction, &arguments, line, lineNumber);
 }
 
 static ProcessorErrorCode CreateAssemblyBuffers (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer, FileBuffer *sourceFile, TextBuffer *sourceText) {
@@ -205,7 +197,7 @@ static ProcessorErrorCode WriteDataToFiles (Buffer <char> *binaryBuffer, Buffer 
     }
 
     if (listingDescriptor != -1) {
-        const char *ListingLegend = " ip \topcode\tsource\n";
+        const char *ListingLegend = " ip \topcode\tline \tsource\n";
 
         if (!WriteBuffer (listingDescriptor, ListingLegend, (ssize_t) strlen (ListingLegend))) {
             ErrorFoundInProgram (OUTPUT_FILE_ERROR, "Error occuried while writing to listing file");
@@ -385,7 +377,25 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine) {
+static ProcessorErrorCode EmitLabel (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer, TextLine *sourceLine, char *labelName, int labelNameLength, int lineNumber) {
+    PushLog (3);
+
+    Label label {};
+    labelName [labelNameLength - 1] = '\0';
+    InitLabel (&label, labelName, (long long) binaryBuffer->currentIndex);
+
+    WriteDataToBufferErrorCheck ("Error occuried while writing label to buffer", labelsBuffer, &label, 1);
+
+    const size_t ServiceInfoLength = 30;
+    char listingInfoBuffer [MAX_INSTRUCTION_LENGTH + ServiceInfoLength] = "";
+
+    sprintf (listingInfoBuffer, "%.4lu\t--\t\t%.4d\t%s\n", binaryBuffer->currentIndex, lineNumber, sourceLine->pointer + FindActualStringBegin (sourceLine));
+    WriteDataToBufferErrorCheck ("Error occuried while writing label to listing buffer", listingBuffer, listingInfoBuffer, strlen (listingInfoBuffer));
+
+    RETURN NO_PROCESSOR_ERRORS;
+}
+
+static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine, int lineNumber) {
     PushLog (3);
     custom_assert (instruction,        pointer_is_null, WRONG_INSTRUCTION);
     custom_assert (binaryBuffer,       pointer_is_null, WRONG_INSTRUCTION);
@@ -394,7 +404,7 @@ static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <
     const size_t ServiceInfoLength = 30;
     char listingInfoBuffer [MAX_INSTRUCTION_LENGTH + ServiceInfoLength] = "";
 
-    sprintf (listingInfoBuffer, "%.4lu\t%.2x\t\t%s\n", binaryBuffer->currentIndex, *(unsigned char *) &instruction->commandCode, sourceLine->pointer + FindActualStringBegin (sourceLine));
+    sprintf (listingInfoBuffer, "%.4lu\t%.2x\t\t%.4d\t%s\n", binaryBuffer->currentIndex, *(unsigned char *) &instruction->commandCode, lineNumber, sourceLine->pointer + FindActualStringBegin (sourceLine));
     WriteDataToBufferErrorCheck ("Error occuried while writing instruction to listing buffer", listingBuffer, listingInfoBuffer, strlen (listingInfoBuffer));
 
     WriteDataToBufferErrorCheck ("Error occuried while writing instruction to binary buffer", binaryBuffer, &instruction->commandCode, sizeof (CommandCode));
