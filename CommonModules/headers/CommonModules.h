@@ -34,6 +34,7 @@ enum ArgumentsType {
     NO_ARGUMENTS      = 0,
     IMMED_ARGUMENT    = 1 << 0,
     REGISTER_ARGUMENT = 1 << 1,
+    MEMORY_ARGUMENT   = 1 << 2,
 };
 
 struct InstructionArguments {
@@ -46,7 +47,7 @@ struct CommandCode {
     unsigned char arguments : 3;
 };
 
-typedef ProcessorErrorCode (*callbackFunction_t)(SPU *spu, CommandCode *commandCode);
+typedef ProcessorErrorCode (*callbackFunction_t)(SPU *spu, CommandCode *commandCode, elem_t *argument);
 
 struct AssemblerInstruction {
     const char *instructionName;
@@ -55,7 +56,7 @@ struct AssemblerInstruction {
     callbackFunction_t callbackFunction;
 };
 
-#define INSTRUCTION_CALLBACK_FUNCTION(INSTRUCTION_NAME) ProcessorErrorCode INSTRUCTION_NAME##Callback (SPU *spu, CommandCode *commandCode)
+#define INSTRUCTION_CALLBACK_FUNCTION(INSTRUCTION_NAME) ProcessorErrorCode INSTRUCTION_NAME##Callback (SPU *spu, CommandCode *commandCode, elem_t *argument)
 
 #define INSTRUCTION(INSTRUCTION_NAME, ...)   \
             INSTRUCTION_CALLBACK_FUNCTION (INSTRUCTION_NAME);

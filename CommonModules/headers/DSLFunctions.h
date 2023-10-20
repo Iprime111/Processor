@@ -41,51 +41,45 @@ inline ComparisonResult CompareValues (elem_t value1, elem_t value2) {
                 (spu)->ip += sizeof (type);                                             \
             }while (0)
 
-#define PushValue(spu, value)                                                               \
-            do {                                                                            \
-                if (StackPush_ (&((spu)->processorStack), value) != NO_ERRORS) {            \
-                    ErrorFoundInProgram (STACK_ERROR, "Stack error occuried while pushing value");   \
-                }                                                                           \
+#define PushValue(spu, value)                                                                       \
+            do {                                                                                    \
+                if (StackPush_ (&((spu)->processorStack), value) != NO_ERRORS) {                    \
+                    ErrorFoundInProgram (STACK_ERROR, "Stack error occuried while pushing value");  \
+                }                                                                                   \
             }while (0)
 
-#define PopValue(spu, value)                                                                \
-            do {                                                                            \
-                if (StackPop_ (&((spu)->processorStack), value) != NO_ERRORS) {             \
-                    ErrorFoundInProgram (STACK_ERROR, "Stack error occuried while poping value");    \
-                }                                                                           \
+#define PopValue(spu, value)                                                                        \
+            do {                                                                                    \
+                if (StackPop_ (&((spu)->processorStack), value) != NO_ERRORS) {                     \
+                    ErrorFoundInProgram (STACK_ERROR, "Stack error occuried while poping value");   \
+                }                                                                                   \
             }while (0)
 
-#define Jump(spu, jmpAddress)                                                                   \
+#define Jump(spu)                                                                               \
             do {                                                                                \
-                if ((ssize_t) jmpAddress >= (spu)->bytecode->buffer_size || jmpAddress < 0) {   \
-                    ErrorFoundInProgram (BUFFER_ENDED, "Out of buffer jump attempt");                    \
+                if ((ssize_t) *argument >= (spu)->bytecode->buffer_size || *argument < 0) {     \
+                    ErrorFoundInProgram (BUFFER_ENDED, "Out of buffer jump attempt");           \
                 }                                                                               \
-                (spu)->ip = (size_t) jmpAddress + sizeof (Header);                              \
+                (spu)->ip = (size_t) *argument + sizeof (Header);                               \
             } while (0)
 
-#define JumpAssemblerCallback                                                                                                   \
-    char currentLabel [128] = "";                                                                                               \
-    ON_DEBUG (char message [128] = "");                                                                                         \
-    if (sscanf (line->pointer + offset, "%*s %lld", (long long *) &arguments->immedArgument) > 0) {                             \
-        isArgumentReadCorrectly = true;                                                                                         \
-    } else if (sscanf (line->pointer + offset, "%*s %s", currentLabel) > 0){                                                    \
-        Label label {};                                                                                                         \
-        InitLabel (&label, currentLabel, -1);                                                                                   \
-        Label *foundLabel = FindValueInBuffer (labelsBuffer, &label, LabelComparatorByName);                                    \
-        if (foundLabel) {                                                                                                       \
-            * (long long *) &arguments->immedArgument = foundLabel->address;                                                    \
-        }                                                                                                                       \
-        isArgumentReadCorrectly = true;                                                                                         \
-    } else {                                                                                                                    \
-        ErrorFound (TOO_FEW_ARGUMENTS, "Wrong arguments format", lineNumber);                                                   \
-    }                                                                                                                           \
-    ON_DEBUG (sprintf (message, "Jump found. Jump address: %lld", *(long long *) &arguments->immedArgument));                   \
-    ON_DEBUG (PrintInfoMessage (message, NULL));                                                                                \
-    instruction->commandCode.arguments = IMMED_ARGUMENT;
+#define JumpAssemblerCallback                                                                                               \
+    if (instruction->commandCode.arguments & MEMORY_ARGUMENT) {                                                             \
+        ErrorFound (TOO_FEW_ARGUMENTS, "Can not use label as a memory address", lineNumber);                                \
+    }                                                                                                                       \
+    Label label {};                                                                                                         \
+    InitLabel (&label, argumentBuffer, -1);                                                                                 \
+    Label *foundLabel = FindValueInBuffer (labelsBuffer, &label, LabelComparatorByName);                                    \
+    arguments->immedArgument = -1;                                                                                          \
+    if (foundLabel) {                                                                                                       \
+        arguments->immedArgument = (double) foundLabel->address;                                                            \
+    }                                                                                                                       \
+    instruction->commandCode.arguments |= IMMED_ARGUMENT;                                                                   \
+
 
 #define JumpDisassemblerCallback                                            \
     if (commandCode->arguments & IMMED_ARGUMENT) {                          \
-        sprintf (commandLine, " %lld\n", * (long long *) &immedArgument);   \
+        sprintf (commandLine, "%.0lf\n%n", immedArgument, &printedSymbols); \
     }
 
 #define ConditionalJump(spu, comparisonResult)                              \
@@ -94,9 +88,7 @@ inline ComparisonResult CompareValues (elem_t value1, elem_t value2) {
                 elem_t value2 = NAN;                                        \
                 PopValue (spu, &value1);                                    \
                 PopValue (spu, &value2);                                    \
-                long long jmpAddress = 0;                                   \
-                ReadData (spu, &jmpAddress, long long);                     \
                 if (CompareValues(value2, value1) & (comparisonResult)) {   \
-                    Jump (spu, jmpAddress);                                 \
+                    Jump (spu);                                             \
                 }                                                           \
             } while (0)

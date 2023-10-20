@@ -40,38 +40,12 @@ INSTRUCTION (in, {2 COMMA 0}, {
 
 }, {}, {})
 
-INSTRUCTION (push, {3 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT}, {
-    elem_t value = 0;
-    unsigned char registerIndex = REGISTER_COUNT;
-
-    if (commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT)){
-        ReadData (spu, &registerIndex, char);
-        ReadData (spu, &value,         elem_t);
-
-        value += spu->registerValues [registerIndex];
-
-    }else if (commandCode->arguments & REGISTER_ARGUMENT){
-        ReadData (spu, &registerIndex, char);
-
-        value = spu->registerValues [registerIndex];
-    }else if (commandCode->arguments & IMMED_ARGUMENT) {
-        ReadData (spu, &value, elem_t);
-    }else {
-        RETURN WRONG_INSTRUCTION;
-    }
-
-    PushValue (spu, value);
+INSTRUCTION (push, {3 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
+    PushValue (spu, *argument);
 }, {}, {})
 
-INSTRUCTION (pop, {4 COMMA REGISTER_ARGUMENT}, {
-    if (commandCode->arguments & REGISTER_ARGUMENT){
-        unsigned char registerIndex = REGISTER_COUNT;
-        ReadData (spu, &registerIndex, char);
-
-        PopValue (spu, spu->registerValues + registerIndex);
-    } else {
-        RETURN WRONG_INSTRUCTION;
-    }
+INSTRUCTION (pop, {4 COMMA REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
+    PopValue (spu, argument);
 }, {}, {})
 
 INSTRUCTION (add, {5 COMMA 0}, {
@@ -138,35 +112,31 @@ INSTRUCTION (sqrt, {11 COMMA 0}, {
     PushValue (spu, sqrt (value));
 }, {}, {})
 
-INSTRUCTION (jmp, {12 COMMA IMMED_ARGUMENT}, {
-    long long jmpAddress = 0;
-    ReadData (spu, &jmpAddress, long long);
-
-
-    Jump (spu, jmpAddress);
+INSTRUCTION (jmp, {12 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
+    Jump (spu);
 }, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
 
-INSTRUCTION (ja, {13 COMMA IMMED_ARGUMENT}, {
+INSTRUCTION (ja, {13 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, GREATER);
 }, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
 
-INSTRUCTION (jae, {14 COMMA IMMED_ARGUMENT}, {
+INSTRUCTION (jae, {14 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, GREATER | EQUAL);
 }, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
 
-INSTRUCTION (jb, {15 COMMA IMMED_ARGUMENT}, {
+INSTRUCTION (jb, {15 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, LESS);
 }, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
 
-INSTRUCTION (jbe, {16 COMMA IMMED_ARGUMENT}, {
+INSTRUCTION (jbe, {16 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, LESS | EQUAL);
 }, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
 
-INSTRUCTION (je, {17 COMMA IMMED_ARGUMENT}, {
+INSTRUCTION (je, {17 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, EQUAL);
 }, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
 
-INSTRUCTION (jne, {18 COMMA IMMED_ARGUMENT}, {
+INSTRUCTION (jne, {18 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, LESS | GREATER);
 }, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
 

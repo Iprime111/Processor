@@ -216,17 +216,25 @@ static ProcessorErrorCode ReadInstruction (Buffer <char> *disassemblyBuffer, SPU
 static ProcessorErrorCode ReadArguments (const AssemblerInstruction *instruction, CommandCode *commandCode, SPU *spu, char *commandLine) {
     PushLog (3);
 
-    char registerIndex = -1;
+    unsigned char registerIndex = REGISTER_COUNT;
     elem_t immedArgument = 0;
     char *registerName = NULL;
+
+    sprintf (commandLine++, " ");
+
+    if (commandCode->arguments & MEMORY_ARGUMENT) {
+        sprintf (commandLine++, "[");
+    }
 
     #define REGISTER(NAME, INDEX)               \
                 if (registerIndex == INDEX) {   \
                     registerName = #NAME;       \
                 }
 
-    if (commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT)) {
-        ReadData (spu, &registerIndex, char);
+    int printedSymbols = 0;
+
+    if (commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT) || commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT)) {
+        ReadData (spu, &registerIndex, unsigned char);
         ReadData (spu, &immedArgument, elem_t);
 
         #include "Registers.def"
@@ -235,14 +243,14 @@ static ProcessorErrorCode ReadArguments (const AssemblerInstruction *instruction
             ErrorFoundInProgram (TOO_FEW_ARGUMENTS, "Wrong register name format");
         }
 
-        sprintf (commandLine, " %s+%lf\n", registerName, immedArgument);
+        sprintf (commandLine, "%s+%lf%n", registerName, immedArgument, &printedSymbols);
 
     }else if (commandCode->arguments & IMMED_ARGUMENT) {
         ReadData (spu, &immedArgument, elem_t);
 
-        sprintf (commandLine, " %lf\n", immedArgument);
+        sprintf (commandLine, "%lf%n", immedArgument, &printedSymbols);
     }else if (commandCode->arguments & REGISTER_ARGUMENT){
-        ReadData (spu, &registerIndex, char);
+        ReadData (spu, &registerIndex, unsigned char);
 
         #include "Registers.def"
 
@@ -250,9 +258,9 @@ static ProcessorErrorCode ReadArguments (const AssemblerInstruction *instruction
             ErrorFoundInProgram (TOO_FEW_ARGUMENTS, "Wrong register name format");
         }
 
-        sprintf (commandLine, " %s\n", registerName);
+        sprintf (commandLine, "%s%n", registerName, &printedSymbols);
     }else {
-        sprintf (commandLine, "\n");
+        sprintf (commandLine, "\n%n", &printedSymbols);
     }
 
     #undef REGISTER
@@ -265,6 +273,14 @@ static ProcessorErrorCode ReadArguments (const AssemblerInstruction *instruction
     #include "Instructions.def"
 
     #undef INSTRUCTION
+
+    commandLine += printedSymbols;
+
+    if (commandCode->arguments & MEMORY_ARGUMENT) {
+        sprintf (commandLine++, "]");
+    }
+
+    sprintf (commandLine, "\n");
 
     RETURN NO_PROCESSOR_ERRORS;
 }

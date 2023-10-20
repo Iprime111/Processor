@@ -26,8 +26,9 @@ const size_t MAX_LABELS_COUNT = 128;
 const int COMPILATIONS_COUNT  = 2;
 
 static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer, TextLine *line, int lineNumber);
-static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int lineNumber);
-static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer, int lineNumber);
+static ProcessorErrorCode CompileInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int lineNumber);
+static ProcessorErrorCode CompileInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer, int lineNumber);
+static ProcessorErrorCode ReadRamBrackets (AssemblerInstruction *instruction, TextLine *line, ssize_t *offset, ArgumentsType permittedArguments, int lineNumber);
 
 static ProcessorErrorCode EmitLabel       (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer, TextLine *sourceLine, char *labelName, int labelNameLength, int lineNumber);
 static ProcessorErrorCode EmitInstruction (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine,    int lineNumber);
@@ -113,7 +114,7 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
     ArgumentsType permittedArguments = NO_ARGUMENTS;
     AssemblerInstruction outputInstruction {"", {0, 0}, NULL};
 
-    if ((errorCode = GetInstructionOpcode (line, &outputInstruction, &permittedArguments, lineNumber)) != NO_PROCESSOR_ERRORS) {
+    if ((errorCode = CompileInstructionOpcode (line, &outputInstruction, &permittedArguments, lineNumber)) != NO_PROCESSOR_ERRORS) {
         RETURN errorCode;
     }
 
@@ -123,7 +124,7 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
         PrintInfoMessage (message, NULL);
     #endif
 
-    if ((errorCode = GetInstructionArgumentsData (&outputInstruction, line, &arguments, permittedArguments, labelsBuffer, lineNumber)) != NO_PROCESSOR_ERRORS) {
+    if ((errorCode = CompileInstructionArgumentsData (&outputInstruction, line, &arguments, permittedArguments, labelsBuffer, lineNumber)) != NO_PROCESSOR_ERRORS) {
         RETURN errorCode;
     }
 
@@ -248,7 +249,7 @@ static ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescript
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int lineNumber) {
+static ProcessorErrorCode CompileInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int lineNumber) {
     PushLog (3);
 
     custom_assert (instruction, pointer_is_null, WRONG_INSTRUCTION);
@@ -281,7 +282,30 @@ static ProcessorErrorCode GetInstructionOpcode (TextLine *line, AssemblerInstruc
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer, int lineNumber) {
+static ProcessorErrorCode ReadRamBrackets (AssemblerInstruction *instruction, TextLine *line, ssize_t *offset, ArgumentsType permittedArguments, int lineNumber) {
+    PushLog (4);
+
+    ssize_t end = FindActualStringEnd (line);
+    bool foundOpenBracket = false;
+
+    if ((size_t) *offset + 1 < line->length && line->pointer [*offset + 1] == '[') {
+        foundOpenBracket = true;
+    }
+
+    if (foundOpenBracket && line->pointer [end] == ']') {
+        *offset += 2;
+
+        if (!(permittedArguments & MEMORY_ARGUMENT)) {
+            ErrorFound (WRONG_INSTRUCTION, "This instruction does not take memory address as an argument", lineNumber);
+        }
+
+        instruction->commandCode.arguments |= MEMORY_ARGUMENT;
+    }
+
+    RETURN NO_PROCESSOR_ERRORS;
+}
+
+static ProcessorErrorCode CompileInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer, int lineNumber) {
     PushLog (3);
     custom_assert (line,        pointer_is_null, NO_BUFFER);
     custom_assert (instruction, pointer_is_null, WRONG_INSTRUCTION);
@@ -289,23 +313,39 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
     ssize_t argumentsCount = CountWhitespaces (line);
 
     if (argumentsCount < 0) {
-        RETURN TOO_FEW_ARGUMENTS;
+        ErrorFoundInProgram (TOO_FEW_ARGUMENTS, "Less than zero arguments have been found");
     }
 
     *arguments = {NAN, REGISTER_COUNT};
 
     TextLine argsLine {line->pointer, line->length };
+
     ssize_t offset = FindActualStringBegin (&argsLine);
+    int deltaOffset = 0;
+    sscanf (line->pointer + offset, "%*s%n", &deltaOffset);
+    if (deltaOffset <= 0) {
+        ErrorFound (WRONG_INSTRUCTION, "Can not read instruction", lineNumber);
+    }
+    offset += deltaOffset;
 
-    char registerNameBuffer [MAX_INSTRUCTION_LENGTH] = "";
+    ErrorFound (ReadRamBrackets (instruction, line, &offset, permittedArguments, lineNumber), "Error occuried while parsing brackets", lineNumber);
 
-    bool isArgumentReadCorrectly = false;
 
-    #define REGISTER(NAME, INDEX)                           \
-                if (!strcmp (#NAME, registerNameBuffer)) {  \
-                    arguments->registerIndex = INDEX;       \
-                    break;                                  \
+    char argumentBuffer [MAX_INSTRUCTION_LENGTH] = "";
+
+    #define REGISTER(NAME, INDEX)                                                                       \
+                if ((permittedArguments & REGISTER_ARGUMENT) && !strcmp (#NAME, argumentBuffer)) {      \
+                    instruction->commandCode.arguments |= REGISTER_ARGUMENT;                            \
+                    arguments->registerIndex = INDEX;                                                   \
+                    break;                                                                              \
                 }
+
+    #define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK, ...)        \
+                if (instruction->commandCode.opcode == ((CommandCode) COMMAND_CODE).opcode){    \
+                    ASSEMBLER_CALLBACK                                                          \
+                    break;                                                                      \
+                }
+
 
     switch (argumentsCount) {
         case 2:
@@ -313,9 +353,8 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
                 ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments", lineNumber);
             }
 
-            if (sscanf (line->pointer + offset, "%*s %3s+%lf", registerNameBuffer, &arguments->immedArgument) > 0) {
-                instruction->commandCode.arguments = IMMED_ARGUMENT | REGISTER_ARGUMENT;
-                isArgumentReadCorrectly = true;
+            if (sscanf (line->pointer + offset, "%3s+%lf", argumentBuffer, &arguments->immedArgument) > 0) {
+                instruction->commandCode.arguments |= IMMED_ARGUMENT;
 
                 #include "Registers.def"
 
@@ -326,32 +365,32 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
             break;
 
         case 0:
-            isArgumentReadCorrectly = true;
             break;
 
         case 1:
-            if (sscanf (line->pointer + offset, "%*s %lf", &arguments->immedArgument) > 0){
+            if (sscanf (line->pointer + offset, "%lf", &arguments->immedArgument) > 0){
                 if (!(permittedArguments & IMMED_ARGUMENT)) {
                     ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments", lineNumber);
                 }
-                instruction->commandCode.arguments = IMMED_ARGUMENT;
+                instruction->commandCode.arguments |= IMMED_ARGUMENT;
 
-            } else if (sscanf (line->pointer + offset, "%*s %s", registerNameBuffer) > 0) {
-                if (!(permittedArguments & REGISTER_ARGUMENT)) {
-                    break;
+            } else if (sscanf (line->pointer + offset, "%s", argumentBuffer) > 0) {
+                size_t bufferLength = strlen (argumentBuffer);
+
+                if ((instruction->commandCode.arguments & MEMORY_ARGUMENT) && argumentBuffer [bufferLength - 1] == ']') {
+                    argumentBuffer [bufferLength - 1] = '\0';
                 }
 
-                isArgumentReadCorrectly = true;
-                instruction->commandCode.arguments = REGISTER_ARGUMENT;
+                ON_DEBUG (fprintf (stderr, "%s\n", argumentBuffer));
 
                 #include "Registers.def"
+
+                #include "Instructions.def"
 
                 ErrorFound (TOO_FEW_ARGUMENTS, "Wrong register name format", lineNumber);
             }else {
                 ErrorFound (TOO_FEW_ARGUMENTS, "Wrong arguments format", lineNumber);
             }
-
-            isArgumentReadCorrectly = true;
             break;
 
         default:
@@ -360,19 +399,7 @@ static ProcessorErrorCode GetInstructionArgumentsData (AssemblerInstruction *ins
     }
 
     #undef REGISTER
-
-    #define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK, ...)        \
-                if (instruction->commandCode.opcode == ((CommandCode) COMMAND_CODE).opcode)     \
-                    ASSEMBLER_CALLBACK                                                          \
-
-
-    #include "Instructions.def"
-
     #undef INSTRUCTION
-
-    if (!isArgumentReadCorrectly) {
-        ErrorFound (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments", lineNumber);
-    }
 
     RETURN NO_PROCESSOR_ERRORS;
 }
