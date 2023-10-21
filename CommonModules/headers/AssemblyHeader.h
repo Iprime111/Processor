@@ -26,7 +26,7 @@ struct Header {
                 WriteDataToBufferErrorCheck ("Error occuried while writing header field " #field " title to listing file",  \
                                     buffer, "\t" #field ":  ", sizeof (#field ":  ") - 1);                                  \
                 WriteDataToBufferErrorCheck ("Error occuried while writing header field " #field " to listing file",        \
-                                    buffer, &(header)->field,   fieldSize);                                                 \
+                                    buffer, &(header)->field,  fieldSize);                                                  \
                 WriteDataToBufferErrorCheck ("Error occuried while writing new line " #field " to listing file",            \
                                     buffer, "\n",              1);                                                          \
             } while (0)
