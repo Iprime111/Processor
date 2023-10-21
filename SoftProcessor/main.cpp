@@ -1,3 +1,8 @@
+#include <cstddef>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "CommonModules.h"
 #include "CustomAssert.h"
 #include "FileIO.h"
@@ -8,11 +13,6 @@
 #include "SoftProcessor.h"
 #include "TextTypes.h"
 #include "Stack/Stack.h"
-
-#include <cstddef>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 static char      *BinaryFile    = NULL;
 static useconds_t FrequencyTime = 0;

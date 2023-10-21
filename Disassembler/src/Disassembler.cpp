@@ -7,15 +7,16 @@
 #include "FileIO.h"
 #include "Logger.h"
 #include "MessageHandler.h"
+#include "Registers.h"
 #include "Stack/StackPrintf.h"
 #include "TextTypes.h"
 #include "Stack/Stack.h"
 #include "SPU.h"
 #include "DSLFunctions.h"
 
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <endian.h>
 
 static ProcessorErrorCode ReadInstruction (Buffer <char> *disassemblyBuffer, SPU *spu);
@@ -43,7 +44,7 @@ ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
 
     if (errorCode != NO_PROCESSOR_ERRORS) {
         errorCode = (ProcessorErrorCode) (DestroyDisassemblyBuffers (&disassemblyBuffer, &headerBuffer) | errorCode);
-        ErrorFoundInProgram (errorCode, "Invalid header readed");
+        ProgramErrorCheck (errorCode, "Invalid header readed");
     }
 
     PrintSuccessMessage ("Starting disassembly...", NULL);
@@ -52,7 +53,7 @@ ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
 
     if (errorCode != BUFFER_ENDED) {
         errorCode = (ProcessorErrorCode) (DestroyDisassemblyBuffers (&disassemblyBuffer, &headerBuffer) | errorCode);
-        ErrorFoundInProgram (errorCode, "Disassembly error occuried");
+        ProgramErrorCheck (errorCode, "Disassembly error occuried");
     }
 
     if ((errorCode = WriteDisassemblyData (outFileDescriptor, &disassemblyBuffer, &headerBuffer)) != NO_PROCESSOR_ERRORS) {
@@ -60,7 +61,7 @@ ProcessorErrorCode DisassembleFile (int outFileDescriptor, SPU *spu) {
         RETURN errorCode;
     }
 
-    ErrorFoundInProgram (DestroyDisassemblyBuffers (&disassemblyBuffer, &headerBuffer), "Error occuried while destroying assembly buffers");
+    ProgramErrorCheck (DestroyDisassemblyBuffers (&disassemblyBuffer, &headerBuffer), "Error occuried while destroying assembly buffers");
 
     PrintSuccessMessage ("Disassembly finished successfully!", NULL);
     RETURN NO_PROCESSOR_ERRORS;
@@ -72,25 +73,14 @@ static ProcessorErrorCode ReadHeader (Buffer <char> *headerBuffer, SPU *spu) {
     custom_assert (headerBuffer, pointer_is_null, NO_BUFFER);
     custom_assert (spu,          pointer_is_null, NO_PROCESSOR);
 
-    Header mainHeader {};
     Header readHeader {};
-    InitHeader (&mainHeader);
-
     ReadData (spu, &readHeader, Header);
 
-    #define CheckHeaderField(field, fieldSize, predicate)                           \
-                if (!(predicate)) {                                                 \
-                    ErrorFoundInProgram (WRONG_HEADER, "Header field " #field " is wrong");  \
-                }else {                                                             \
-                    WriteHeaderField (headerBuffer, &readHeader, field, fieldSize); \
-                }
+    ProgramErrorCheck (CheckHeader (&readHeader), "Header is corrupted");
 
-
-    CheckHeaderField (signature, sizeof (unsigned short),        readHeader.signature == mainHeader.signature);
-    CheckHeaderField (version,   sizeof (VERSION) - 1,           !strcmp (readHeader.version,   mainHeader.version));
-    CheckHeaderField (byteOrder, sizeof (SYSTEM_BYTE_ORDER) - 1, !strcmp (readHeader.byteOrder, mainHeader.byteOrder));
-
-    #undef CheckHeaderField
+    WriteHeaderField (headerBuffer, &readHeader, signature, sizeof (unsigned short));
+    WriteHeaderField (headerBuffer, &readHeader, version,   sizeof (VERSION) - 1);
+    WriteHeaderField (headerBuffer, &readHeader, byteOrder, sizeof (SYSTEM_BYTE_ORDER) - 1);
 
     WriteDataToBufferErrorCheck ("Error occuried while writing new line to header buffer", headerBuffer, "\n\n", 2);
 
@@ -108,23 +98,11 @@ static ProcessorErrorCode CreateDisassemblyBuffers (Buffer <char> *disassemblyBu
     // ip     line
     //0000\t  push ...
     //worst case: 1 byte of instruction = 9 bytes of symbols + '\n' symbol = 10 bytes
-
-    disassemblyBuffer->capacity = (size_t) spu->bytecode->buffer_size * 10 + sizeof (Header);
-    disassemblyBuffer->data = (char *) calloc (disassemblyBuffer->capacity, sizeof (char));
-
-    if (!disassemblyBuffer->data) {
-        ErrorFoundInProgram (NO_BUFFER, "Unable to create disassembly file Buffer <char>");
-    }
+    ProgramErrorCheck (InitBuffer (disassemblyBuffer, (size_t) spu->bytecode->buffer_size * 10 + sizeof (Header)), "Unable to create disassembly buffer");
 
     // Creating header file
     // size: header size + 100
-
-    headerBuffer->capacity = sizeof (Header) + 100;
-    headerBuffer->data = (char *) calloc (headerBuffer->capacity, sizeof (char));
-
-    if (!headerBuffer->data) {
-        ErrorFoundInProgram (NO_BUFFER, "Unable to create header Buffer <char>");
-    }
+    ProgramErrorCheck (InitBuffer (headerBuffer, sizeof (Header) + 100), "Unable to create header buffer");
 
     RETURN NO_PROCESSOR_ERRORS;
 }
@@ -132,13 +110,8 @@ static ProcessorErrorCode CreateDisassemblyBuffers (Buffer <char> *disassemblyBu
 static ProcessorErrorCode DestroyDisassemblyBuffers (Buffer <char> *disassemblyBuffer, Buffer <char> *headerBuffer) {
     PushLog (3);
 
-    if (disassemblyBuffer) {
-        free (disassemblyBuffer->data);
-    }
-
-    if (headerBuffer) {
-        free (headerBuffer->data);
-    }
+    DestroyBuffer (disassemblyBuffer);
+    DestroyBuffer (headerBuffer);
 
     RETURN NO_PROCESSOR_ERRORS;
 }
@@ -149,11 +122,11 @@ static ProcessorErrorCode WriteHeaderData (int outFileDescriptor, Buffer <char> 
     const char HeaderLabel [] = "HEADER:\n";
 
     if (!WriteBuffer (outFileDescriptor, HeaderLabel, (ssize_t) strlen (HeaderLabel))) {
-        ErrorFoundInProgram (OUTPUT_FILE_ERROR, "Error occuried while writing header to the disassembly file");
+        ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing header to the disassembly file");
     }
 
     if (!WriteBuffer (outFileDescriptor, headerBuffer->data, (ssize_t) headerBuffer->currentIndex)) {
-        ErrorFoundInProgram (OUTPUT_FILE_ERROR, "Error occuried while writing header to the disassembly file");
+        ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing header to the disassembly file");
     }
 
     RETURN NO_PROCESSOR_ERRORS;
@@ -162,16 +135,16 @@ static ProcessorErrorCode WriteHeaderData (int outFileDescriptor, Buffer <char> 
 static ProcessorErrorCode WriteDisassemblyData (int outFileDescriptor, Buffer <char> *disassemblyBuffer, Buffer <char> *headerBuffer) {
     PushLog (2);
 
-    ErrorFoundInProgram (WriteHeaderData (outFileDescriptor, headerBuffer), "Error occuried while reading header");
+    ProgramErrorCheck (WriteHeaderData (outFileDescriptor, headerBuffer), "Error occuried while reading header");
 
     const char DisassemblyLegend[] = " ip \tdisassembly\n";
 
     if (!WriteBuffer (outFileDescriptor, DisassemblyLegend, (ssize_t) strlen (DisassemblyLegend))) {
-        ErrorFoundInProgram (OUTPUT_FILE_ERROR, "Error occuried while writing to the disassembly file");
+        ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing to the disassembly file");
     }
 
     if (!WriteBuffer (outFileDescriptor, disassemblyBuffer->data, (ssize_t) disassemblyBuffer->currentIndex)) {
-        ErrorFoundInProgram (OUTPUT_FILE_ERROR, "Error occuried while writing to the disassembly file");
+        ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing to the disassembly file");
     }
 
     RETURN NO_PROCESSOR_ERRORS;
@@ -188,17 +161,17 @@ static ProcessorErrorCode ReadInstruction (Buffer <char> *disassemblyBuffer, SPU
     const AssemblerInstruction *instruction = FindInstructionByOpcode (commandCode.opcode);
 
     if (!instruction){
-        ErrorFoundInProgram (WRONG_INSTRUCTION, "Wrong instruction readed");
+        ProgramErrorCheck (WRONG_INSTRUCTION, "Wrong instruction readed");
     }
 
-    #ifndef _NDEBUG
+    ON_DEBUG(
         char message [128] = "";
         sprintf (message, "Reading command %s", instruction->instructionName);
         PrintInfoMessage (message, NULL);
-    #endif
+    )
 
     if ((~instruction->commandCode.arguments) & commandCode.arguments) {
-        ErrorFoundInProgram (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
+        ProgramErrorCheck (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
     }
 
     char commandLine [MAX_INSTRUCTION_LENGTH] = "";
@@ -207,7 +180,7 @@ static ProcessorErrorCode ReadInstruction (Buffer <char> *disassemblyBuffer, SPU
 
     ProcessorErrorCode errorCode = ReadArguments (instruction, &commandCode, spu, commandLine + bytesPrinted);
     if (errorCode != NO_PROCESSOR_ERRORS) {
-        ErrorFoundInProgram (errorCode, "Error occuried while reading function arguments");
+        ProgramErrorCheck (errorCode, "Error occuried while reading function arguments");
     }
 
     RETURN WriteDataToBuffer (disassemblyBuffer, commandLine, strlen (commandLine));
@@ -218,7 +191,6 @@ static ProcessorErrorCode ReadArguments (const AssemblerInstruction *instruction
 
     unsigned char registerIndex = REGISTER_COUNT;
     elem_t immedArgument = 0;
-    char *registerName = NULL;
 
     sprintf (commandLine++, " ");
 
@@ -226,41 +198,35 @@ static ProcessorErrorCode ReadArguments (const AssemblerInstruction *instruction
         sprintf (commandLine++, "[");
     }
 
-    #define REGISTER(NAME, INDEX)               \
-                if (registerIndex == INDEX) {   \
-                    registerName = #NAME;       \
-                }
-
     int printedSymbols = 0;
 
     if (commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT) || commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT)) {
         ReadData (spu, &registerIndex, unsigned char);
         ReadData (spu, &immedArgument, elem_t);
 
-        #include "Registers.def"
+        const Register *foundRegister = FindRegisterByIndex (registerIndex);
 
-        if (!registerName) {
-            ErrorFoundInProgram (TOO_FEW_ARGUMENTS, "Wrong register name format");
+        if (!foundRegister) {
+            ProgramErrorCheck (TOO_FEW_ARGUMENTS, "Wrong register name format");
         }
 
-        sprintf (commandLine, "%s+%lf%n", registerName, immedArgument, &printedSymbols);
+        sprintf (commandLine, "%s+%lf%n", foundRegister->name, immedArgument, &printedSymbols);
 
     }else if (commandCode->arguments & IMMED_ARGUMENT) {
         ReadData (spu, &immedArgument, elem_t);
-
         sprintf (commandLine, "%lf%n", immedArgument, &printedSymbols);
+
     }else if (commandCode->arguments & REGISTER_ARGUMENT){
         ReadData (spu, &registerIndex, unsigned char);
 
-        #include "Registers.def"
+        const Register *foundRegister = FindRegisterByIndex (registerIndex);
 
-        if (!registerName) {
-            ErrorFoundInProgram (TOO_FEW_ARGUMENTS, "Wrong register name format");
+        if (!foundRegister) {
+            ProgramErrorCheck (TOO_FEW_ARGUMENTS, "Wrong register name format");
         }
 
-        sprintf (commandLine, "%s%n", registerName, &printedSymbols);
-    }else {
-        sprintf (commandLine, "\n%n", &printedSymbols);
+        sprintf (commandLine, "%s%n", foundRegister->name, &printedSymbols);
+
     }
 
     #undef REGISTER

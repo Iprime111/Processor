@@ -1,7 +1,8 @@
+#include <string.h>
+
 #include "Label.h"
 #include "Buffer.h"
 #include "CustomAssert.h"
-#include <cstring>
 
 ProcessorErrorCode InitLabel (Label *label, char *name, long long address) {
     PushLog (4);

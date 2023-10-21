@@ -1,0 +1,40 @@
+#include <string.h>
+
+#include "Registers.h"
+#include "Logger.h"
+
+#define REGISTER(NAME, INDEX) {.name=#NAME, .index=INDEX}
+
+static const Register Registers [REGISTER_COUNT] = {
+    REGISTER (rax, 0),
+    REGISTER (rbx, 2),
+    REGISTER (rcx, 3),
+    REGISTER (rdx, 4),
+};
+
+#undef REGISTER
+
+#define FindRegister(predicate)                                                                     \
+            do {                                                                                    \
+                for (size_t registerIndex = 0; registerIndex < REGISTER_COUNT; registerIndex++) {   \
+                    if (predicate) {                                                                \
+                        RETURN Registers + registerIndex;                                           \
+                    }                                                                               \
+                }                                                                                   \
+                RETURN NULL;                                                                        \
+            }while (0)                                                                              \
+
+
+const Register *FindRegisterByName  (char *name) {
+    PushLog (4);
+
+    FindRegister (!strcmp (Registers [registerIndex].name, name));
+}
+
+const Register *FindRegisterByIndex (unsigned char index) {
+    PushLog (4);
+
+    FindRegister (Registers [registerIndex].index == index);
+}
+
+#undef FindRegister

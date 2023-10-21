@@ -1,12 +1,14 @@
 //INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK, DISASSEMBLER_CALLBACK)
 
+#include "CommonModules.h"
+#include "Logger.h"
 #define COMMA ,
 
-INSTRUCTION (hlt, {0 COMMA 0}, {
+INSTRUCTION (hlt, {0 COMMA NO_ARGUMENTS}, {
     RETURN PROCESSOR_HALT;
 }, {}, {})
 
-INSTRUCTION (out, {1 COMMA 0}, {
+INSTRUCTION (out, {1 COMMA NO_ARGUMENTS}, {
     elem_t value {};
     PopValue(spu, &value);
 
@@ -14,27 +16,29 @@ INSTRUCTION (out, {1 COMMA 0}, {
     "╔═══════════════════════════════╗\n"
     "║ Output data:                  ║\n"
     "╚═══════════════════════════════╝\n"
-    "\033[15C \033[2A"
+    MOVE_CURSOR_FORWARD (15)
+    MOVE_CURSOR_UP      (2)
     ); //Escape codes for positioning cursor
 
     PrintData (CONSOLE_DEFAULT, CONSOLE_BOLD, stdout, value);
-    printf ("\033[1B\r");
+    printf (MOVE_CURSOR_DOWN (1) "\r"); //TODO move to define
 
     fputs ("\n", stdout);
 }, {}, {})
 
-INSTRUCTION (in, {2 COMMA 0}, {
+INSTRUCTION (in, {2 COMMA NO_ARGUMENTS}, {
     elem_t value {};
 
     printf_color (CONSOLE_WHITE, CONSOLE_BOLD,
     "╔═══════════════════════════════╗\n"
     "║ Enter value:                  ║\n"
     "╚═══════════════════════════════╝\n"
-    "\033[14C \033[2A"
+    MOVE_CURSOR_FORWARD (15)
+    MOVE_CURSOR_UP      (2)
     ); //Escape codes for positioning cursor
 
     scanf ("%lf", &value);
-    printf ("\033[1B\r");
+    printf (MOVE_CURSOR_DOWN (1) "\r");
 
     PushValue (spu, value);
 
@@ -48,7 +52,7 @@ INSTRUCTION (pop, {4 COMMA REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     PopValue (spu, argument);
 }, {}, {})
 
-INSTRUCTION (add, {5 COMMA 0}, {
+INSTRUCTION (add, {5 COMMA NO_ARGUMENTS}, {
     elem_t value1 {};
     elem_t value2 {};
 
@@ -58,7 +62,7 @@ INSTRUCTION (add, {5 COMMA 0}, {
     PushValue (spu, value1 + value2);
 }, {}, {})
 
-INSTRUCTION (sub, {6 COMMA 0}, {
+INSTRUCTION (sub, {6 COMMA NO_ARGUMENTS}, {
     elem_t value1 {};
     elem_t value2 {};
 
@@ -68,7 +72,7 @@ INSTRUCTION (sub, {6 COMMA 0}, {
     PushValue (spu, value2 - value1);
 }, {}, {})
 
-INSTRUCTION (mul, {7 COMMA 0}, {
+INSTRUCTION (mul, {7 COMMA NO_ARGUMENTS}, {
     elem_t value1 {};
     elem_t value2 {};
 
@@ -78,7 +82,7 @@ INSTRUCTION (mul, {7 COMMA 0}, {
     PushValue (spu, value1 * value2);
 }, {}, {})
 
-INSTRUCTION (div, {8 COMMA 0}, {
+INSTRUCTION (div, {8 COMMA NO_ARGUMENTS}, {
     elem_t value1 {};
     elem_t value2 {};
 
@@ -88,7 +92,7 @@ INSTRUCTION (div, {8 COMMA 0}, {
     PushValue (spu, value2 / value1);
 }, {}, {})
 
-INSTRUCTION (sin, {9 COMMA 0}, {
+INSTRUCTION (sin, {9 COMMA NO_ARGUMENTS}, {
     elem_t value {};
 
     PopValue (spu, &value);
@@ -96,7 +100,7 @@ INSTRUCTION (sin, {9 COMMA 0}, {
     PushValue (spu, sin (value));
 }, {}, {})
 
-INSTRUCTION (cos, {10 COMMA 0}, {
+INSTRUCTION (cos, {10 COMMA NO_ARGUMENTS}, {
     elem_t value {};
 
     PopValue (spu, &value);
@@ -104,7 +108,7 @@ INSTRUCTION (cos, {10 COMMA 0}, {
     PushValue (spu, cos (value));
 }, {}, {})
 
-INSTRUCTION (sqrt, {11 COMMA 0}, {
+INSTRUCTION (sqrt, {11 COMMA NO_ARGUMENTS}, {
     elem_t value {};
 
     PopValue (spu, &value);
@@ -113,7 +117,7 @@ INSTRUCTION (sqrt, {11 COMMA 0}, {
 }, {}, {})
 
 INSTRUCTION (jmp, {12 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
-    Jump (spu);
+    Jump (spu, *argument);
 }, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
 
 INSTRUCTION (ja, {13 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
@@ -140,5 +144,18 @@ INSTRUCTION (jne, {18 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT
     ConditionalJump (spu, LESS | GREATER);
 }, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
 
+INSTRUCTION (call, {19 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
+    PushReturnAddress (spu, (elem_t) (spu->ip - sizeof (Header)));
+    Jump (spu, *argument);
+
+}, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
+
+INSTRUCTION (ret, {20 COMMA NO_ARGUMENTS}, {
+    elem_t returnAddress = -1;
+    PopReturnAddress (spu, &returnAddress);
+
+    Jump (spu, returnAddress);
+
+}, {}, {})
 
 #undef COMMA

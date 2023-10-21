@@ -1,11 +1,12 @@
 #ifndef BUFFER_H_
 #define BUFFER_H_
 
+#include <stdlib.h>
+#include <stddef.h>
+
 #include "CommonModules.h"
 #include "Logger.h"
 #include "MessageHandler.h"
-#include <cstdlib>
-#include <stddef.h>
 
 typedef long long comparator_t (void *, void *);
 
@@ -22,7 +23,7 @@ struct Buffer {
 				ProcessorErrorCode _errorCode = NO_PROCESSOR_ERRORS;															\
         		if ((_errorCode = WriteDataToBuffer (buffer, data, dataSize)) != NO_PROCESSOR_ERRORS) {                         \
         		    DestroyBuffer (buffer);                                                                                     \
-        		    ErrorFoundInProgram (_errorCode, errorMessage);                                                             \
+        		    ProgramErrorCheck (_errorCode, errorMessage);                                                             	\
         		}																												\
 			} while (0)
 
@@ -34,7 +35,7 @@ ProcessorErrorCode WriteDataToBuffer (Buffer <T> *buffer, const void *data, size
   	custom_assert (data,   pointer_is_null, NO_BUFFER);
 
   	if (dataSize > buffer->capacity - buffer->currentIndex) {
-    	ErrorFoundInProgram (BUFFER_ENDED, "Too many data to write into the buffer");
+    	ProgramErrorCheck (BUFFER_ENDED, "Too many data to write into the buffer");
   	}
 
   	for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++) {
@@ -54,7 +55,7 @@ ProcessorErrorCode InitBuffer (Buffer <T> *buffer, size_t capacity) {
 	buffer->data = (T *) calloc (buffer->capacity, sizeof (T));
 
 	if (!buffer->data) {
-		ErrorFoundInProgram (NO_BUFFER, "Error occuried while allocating buffer");
+		ProgramErrorCheck (NO_BUFFER, "Error occuried while allocating buffer");
 	}
 
 	RETURN NO_PROCESSOR_ERRORS;

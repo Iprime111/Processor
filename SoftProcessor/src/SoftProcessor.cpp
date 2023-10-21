@@ -1,3 +1,8 @@
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "AssemblyHeader.h"
 #include "MessageHandler.h"
 #include "SecureStack/SecureStack.h"
@@ -11,11 +16,6 @@
 #include "Stack/Stack.h"
 #include "SPU.h"
 #include "DSLFunctions.h"
-
-#include <cstddef>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
 
 static ProcessorErrorCode ReadInstruction (SPU *spu);
 static ProcessorErrorCode ReadHeader (SPU *spu);
@@ -32,11 +32,13 @@ ProcessorErrorCode ExecuteFile (SPU *spu) {
 	ReadHeader (spu);
 
   	StackInitDefault_ (&spu->processorStack);
+	StackInitDefault_ (&spu->callStack);
 	PrintSuccessMessage ("Starting execution...", NULL);
 
   	while (ReadInstruction (spu) == NO_PROCESSOR_ERRORS);
 
   	StackDestruct_ (&spu->processorStack);
+	StackDestruct_ (&spu->callStack);
 
   	RETURN NO_PROCESSOR_ERRORS;
 }
@@ -47,23 +49,12 @@ static ProcessorErrorCode ReadHeader (SPU *spu) {
 	custom_assert (spu, pointer_is_null, NO_PROCESSOR);
 
 	Header mainHeader {};
-    Header readedHeader {};
+    Header readHeader {};
     InitHeader (&mainHeader);
 
-    ReadData (spu, &readedHeader, Header);
+    ReadData (spu, &readHeader, Header);
 
-    #define CheckHeaderField(field, predicate)                                      	     \
-                if (!(predicate)) {                                                 	     \
-                    ErrorFoundInProgram (WRONG_HEADER, "Header field " #field " is wrong");  \
-                }
-
-    CheckHeaderField (SIGNATURE,  readedHeader.signature == mainHeader.signature);
-    CheckHeaderField (VERSION,    !strcmp (readedHeader.version,   mainHeader.version));
-    CheckHeaderField (BYTE_ORDER, !strcmp (readedHeader.byteOrder, mainHeader.byteOrder));
-
-    #undef CheckHeaderField
-
-	RETURN NO_PROCESSOR_ERRORS;
+	RETURN CheckHeader (&readHeader);
 }
 
 static ProcessorErrorCode ReadInstruction (SPU *spu) {
@@ -77,7 +68,7 @@ static ProcessorErrorCode ReadInstruction (SPU *spu) {
 	const AssemblerInstruction *instruction = FindInstructionByOpcode (commandCode.opcode);
 
 	if (instruction == NULL) {
-		ErrorFoundInProgram (WRONG_INSTRUCTION, "Wrong instruction readed");
+		ProgramErrorCheck (WRONG_INSTRUCTION, "Wrong instruction readed");
 	}
 
 	elem_t *argumentPointer = NULL;
@@ -97,7 +88,7 @@ static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *in
 	PushLog (2);
 
 	if ((~instruction->commandCode.arguments) & commandCode->arguments) {
-		ErrorFoundInProgram (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
+		ProgramErrorCheck (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
 	}
 
 	if (commandCode->arguments == NO_ARGUMENTS) {

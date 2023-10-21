@@ -1,11 +1,11 @@
+#include <stdio.h>
+
 #include "MessageHandler.h"
 #include "CommonModules.h"
 #include "ColorConsole.h"
 #include "CustomAssert.h"
 #include "Logger.h"
 #include "SecureStack/SecureStack.h"
-
-#include <stdio.h>
 
 static char *GlobalPrefix = NULL;
 
@@ -41,7 +41,7 @@ static void PrintError (FILE *stream, ProcessorErrorCode errorCode, CONSOLE_COLO
     }
 
     fprintf_color (color, CONSOLE_NORMAL, stream, "(");
-    ON_DEBUG (fprintf_color (color, CONSOLE_BOLD, stream, "%s:%d in <%s>. ", message->file, message->line, message->function));
+    ON_DEBUG (fprintf_color (color, CONSOLE_BOLD, stream, "%s:%d in %s. ", message->file, message->line, message->function));
 
     if (message->asmLine >= 0) {
         fprintf_color (CONSOLE_WHITE, CONSOLE_BOLD, stream, "Source line %d. ", message->asmLine);

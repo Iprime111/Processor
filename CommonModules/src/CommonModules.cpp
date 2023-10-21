@@ -1,9 +1,7 @@
+#include <string.h>
+
 #include "CustomAssert.h"
 #include "CommonModules.h"
-#include "Logger.h"
-
-#include <string.h>
-#include <string>
 
 #define INSTRUCTION(NAME, COMMAND_CODE, ...)        \
             {                                       \

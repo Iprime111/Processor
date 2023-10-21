@@ -1,12 +1,12 @@
 #ifndef LABEL_H_
 #define LABEL_H_
 
+#include <string.h>
+#include <stddef.h>
+
 #include "CommonModules.h"
 #include "CustomAssert.h"
 #include "Logger.h"
-#include <cstring>
-
-#include <stddef.h>
 
 const size_t LABEL_NAME_LENGTH = 128;
 

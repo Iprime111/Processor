@@ -1,12 +1,12 @@
 #ifndef COMMON_MODULES_H_
 #define COMMON_MODULES_H_
 
+#include <math.h>
+#include <stddef.h>
+
 #include "CustomAssert.h"
 #include "Logger.h"
 #include "SPU.h"
-
-#include <math.h>
-#include <stddef.h>
 
 const long long FIXED_FLOAT_PRECISION = 1e3;
 
@@ -71,17 +71,6 @@ const AssemblerInstruction *FindInstructionByOpcode (int instruction);
 
 bool CopyVariableValue (void *destination, void *source, size_t size);
 char *convertToString ();
-
-#define WriteHeaderField(buffer, header, field, fieldSize)                                                                  \
-            do {                                                                                                            \
-                WriteDataToBufferErrorCheck ("Error occuried while writing header field " #field " title to listing file",  \
-                                    buffer, "\t" #field ":  ", sizeof (#field ":  ") - 1);                                  \
-                WriteDataToBufferErrorCheck ("Error occuried while writing header field " #field " to listing file",        \
-                                    buffer, &(header)->field,   fieldSize);                                                 \
-                WriteDataToBufferErrorCheck ("Error occuried while writing new line " #field " to listing file",            \
-                                    buffer, "\n",              1);                                                          \
-            } while (0)
-
 
 #ifndef _NDEBUG
     #define ON_DEBUG(...) __VA_ARGS__

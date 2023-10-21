@@ -1,8 +1,9 @@
+#include <math.h>
+
 #include "Buffer.h"
 #include "CommonModules.h"
 #include "Logger.h"
 #include "MessageHandler.h"
-#include <cmath>
 
 enum ComparisonResult {
     GREATER   = 1 << 0,
@@ -44,28 +45,42 @@ inline ComparisonResult CompareValues (elem_t value1, elem_t value2) {
 #define PushValue(spu, value)                                                                       \
             do {                                                                                    \
                 if (StackPush_ (&((spu)->processorStack), value) != NO_ERRORS) {                    \
-                    ErrorFoundInProgram (STACK_ERROR, "Stack error occuried while pushing value");  \
+                    ProgramErrorCheck (STACK_ERROR, "Stack error occuried while pushing value");    \
                 }                                                                                   \
             }while (0)
 
 #define PopValue(spu, value)                                                                        \
             do {                                                                                    \
                 if (StackPop_ (&((spu)->processorStack), value) != NO_ERRORS) {                     \
-                    ErrorFoundInProgram (STACK_ERROR, "Stack error occuried while poping value");   \
+                    ProgramErrorCheck (STACK_ERROR, "Stack error occuried while poping value");     \
                 }                                                                                   \
             }while (0)
 
-#define Jump(spu)                                                                               \
+#define PushReturnAddress(spu, value)                                                                               \
+            do {                                                                                                    \
+                if (StackPush_ (&((spu)->callStack), value) != NO_ERRORS) {                                         \
+                    ProgramErrorCheck (STACK_ERROR, "Stack error occuried while pushing function return address");  \
+                }                                                                                                   \
+            }while (0)
+
+#define PopReturnAddress(spu, value)                                                                                \
+            do {                                                                                                    \
+                if (StackPop_ (&((spu)->callStack), value) != NO_ERRORS) {                                          \
+                    ProgramErrorCheck (STACK_ERROR, "Stack error occuried while poping function return address");   \
+                }                                                                                                   \
+            }while (0)
+
+#define Jump(spu, jmpAddress)                                                                   \
             do {                                                                                \
-                if ((ssize_t) *argument >= (spu)->bytecode->buffer_size || *argument < 0) {     \
-                    ErrorFoundInProgram (BUFFER_ENDED, "Out of buffer jump attempt");           \
+                if ((ssize_t) jmpAddress >= (spu)->bytecode->buffer_size || jmpAddress < 0) {   \
+                    ProgramErrorCheck (BUFFER_ENDED, "Out of buffer jump attempt");             \
                 }                                                                               \
-                (spu)->ip = (size_t) *argument + sizeof (Header);                               \
+                (spu)->ip = (size_t) jmpAddress + sizeof (Header);                              \
             } while (0)
 
 #define JumpAssemblerCallback                                                                                               \
     if (instruction->commandCode.arguments & MEMORY_ARGUMENT) {                                                             \
-        ErrorFound (TOO_FEW_ARGUMENTS, "Can not use label as a memory address", lineNumber);                                \
+        SyntaxErrorCheck (TOO_FEW_ARGUMENTS, "Can not use label as a memory address", lineNumber);                          \
     }                                                                                                                       \
     Label label {};                                                                                                         \
     InitLabel (&label, argumentBuffer, -1);                                                                                 \
@@ -79,7 +94,7 @@ inline ComparisonResult CompareValues (elem_t value1, elem_t value2) {
 
 #define JumpDisassemblerCallback                                            \
     if (commandCode->arguments & IMMED_ARGUMENT) {                          \
-        sprintf (commandLine, "%.0lf\n%n", immedArgument, &printedSymbols); \
+        sprintf (commandLine, "%.0lf%n", immedArgument, &printedSymbols);   \
     }
 
 #define ConditionalJump(spu, comparisonResult)                              \
@@ -89,6 +104,6 @@ inline ComparisonResult CompareValues (elem_t value1, elem_t value2) {
                 PopValue (spu, &value1);                                    \
                 PopValue (spu, &value2);                                    \
                 if (CompareValues(value2, value1) & (comparisonResult)) {   \
-                    Jump (spu);                                             \
+                    Jump (spu, *argument);                                  \
                 }                                                           \
             } while (0)

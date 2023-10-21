@@ -25,7 +25,7 @@ void SetGlobalMessagePrefix (char *newPrefix);
 #define PrintInfoMessage(errorMessage, messagePrefix)                        PrintMessage (stdout, {NO_PROCESSOR_ERRORS, INFO_MESSAGE,    errorMessage, messagePrefix, __LINE__, __FILE__, __PRETTY_FUNCTION__, 0})
 #define PrintSuccessMessage(errorMessage, messagePrefix)                     PrintMessage (stdout, {NO_PROCESSOR_ERRORS, SUCCESS_MESSAGE, errorMessage, messagePrefix, __LINE__, __FILE__, __PRETTY_FUNCTION__, 0})
 
-#define ErrorFound(errorCode, errorMessage, asmLine)                            \
+#define SyntaxErrorCheck(errorCode, errorMessage, asmLine)                            \
             do {                                                                \
                 if (errorCode != NO_PROCESSOR_ERRORS) {                         \
                     PrintErrorMessage (errorCode, errorMessage, NULL, asmLine); \
@@ -33,6 +33,6 @@ void SetGlobalMessagePrefix (char *newPrefix);
                 }                                                               \
             }while (0)
 
-#define ErrorFoundInProgram(errorCode, errorMessage) ErrorFound (errorCode, errorMessage, -1)
+#define ProgramErrorCheck(errorCode, errorMessage) SyntaxErrorCheck (errorCode, errorMessage, -1)
 
 #endif

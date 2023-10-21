@@ -14,7 +14,7 @@
 
 static char *SourceFile  = NULL;
 static char *ListingFile = NULL;
-static char *BinaryFile  = "a.out"; // TODO think 'bout it
+static char *BinaryFile  = "a.out"; 
 
 void AddSource  (char **arguments);
 void AddBinary  (char **arguments);
@@ -22,7 +22,6 @@ void AddListing (char **arguments);
 
 static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer, int *binaryDescriptor, int *listingDescriptor);
 
-// TODO create the best listing
 int main (int argc, char **argv) {
     PushLog (1);
 
@@ -33,8 +32,6 @@ int main (int argc, char **argv) {
     register_flag ("-l", "--listing", AddListing, 1);
     register_flag ("-o", "--output",  AddBinary,  1);
     parse_flags (argc, argv);
-    // TODO parser -> stores flags -> get("...")
-    // TODO: get_flag(parser, "binary")
 
     //Process source files
     FileBuffer fileBuffer = {};
