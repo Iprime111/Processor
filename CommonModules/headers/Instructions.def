@@ -1,7 +1,5 @@
 //INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK, DISASSEMBLER_CALLBACK)
 
-#include "CommonModules.h"
-#include "Logger.h"
 #define COMMA ,
 
 INSTRUCTION (hlt, {0 COMMA NO_ARGUMENTS}, {
@@ -21,7 +19,7 @@ INSTRUCTION (out, {1 COMMA NO_ARGUMENTS}, {
     ); //Escape codes for positioning cursor
 
     PrintData (CONSOLE_DEFAULT, CONSOLE_BOLD, stdout, value);
-    printf (MOVE_CURSOR_DOWN (1) "\r"); //TODO move to define
+    printf (MOVE_CURSOR_DOWN (1) "\r");
 
     fputs ("\n", stdout);
 }, {}, {})
@@ -145,7 +143,7 @@ INSTRUCTION (jne, {18 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT
 }, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
 
 INSTRUCTION (call, {19 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
-    PushReturnAddress (spu, (elem_t) (spu->ip - sizeof (Header)));
+    PushReturnAddress (spu, (elem_t) (spu->ip));
     Jump (spu, *argument);
 
 }, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
@@ -155,7 +153,6 @@ INSTRUCTION (ret, {20 COMMA NO_ARGUMENTS}, {
     PopReturnAddress (spu, &returnAddress);
 
     Jump (spu, returnAddress);
-
 }, {}, {})
 
 #undef COMMA

@@ -4,6 +4,9 @@
 #include <unistd.h>
 
 #include "AssemblyHeader.h"
+#include "Buffer.h"
+#include "Debugger.h"
+#include "FileIO.h"
 #include "MessageHandler.h"
 #include "SecureStack/SecureStack.h"
 #include "SoftProcessor.h"
@@ -17,50 +20,94 @@
 #include "SPU.h"
 #include "DSLFunctions.h"
 
-static ProcessorErrorCode ReadInstruction (SPU *spu);
-static ProcessorErrorCode ReadHeader (SPU *spu);
+static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *breakpointsBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, TextBuffer *sourceText);
+static ProcessorErrorCode ReadHeader      (SPU *spu, Header *readHeader);
+static ProcessorErrorCode ReadDebugInfo   (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, size_t commandsCount);
 
 static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *instruction, const CommandCode *commandCode, elem_t **argumentPointer);
 
-// TODO add processor dump
-ProcessorErrorCode ExecuteFile (SPU *spu) {
+//TODO debug mode turn off function
+ProcessorErrorCode ExecuteFile (SPU *spu, char *sourceFilename) {
   	PushLog (1);
+
+	TextBuffer sourceText = {};
+	FileBuffer sourceData = {};
+	ProgramErrorCheck (ReadSourceFile (&sourceData, &sourceText, sourceFilename), "Error occuried while reading source file");
 
   	CheckBuffer (spu);
 
 	PrintSuccessMessage ("Reading header...", NULL);
-	ReadHeader (spu);
+
+	Header header = {};
+	ProgramErrorCheck (ReadHeader (spu, &header), "Error occuried while reading header");
+
+	Buffer <DebugInfoChunk> debugInfoBuffer =   {0, 0, NULL};
+	ProgramErrorCheck (ReadDebugInfo (spu, &debugInfoBuffer, header.commandsCount), "Error occuried while reading debug info");
+
+	Buffer <DebugInfoChunk> breakpointsBuffer = {0, 0, NULL};
+	ProgramErrorCheck(InitBuffer (&breakpointsBuffer, DEFAULT_BREAKPOINTS_BUFFER_CAPACITY), "Error occuried while initializing breakpoints buffer");
+	InitDebugConsole ();
+
+	DebugConsole (spu, &debugInfoBuffer, &breakpointsBuffer);
 
   	StackInitDefault_ (&spu->processorStack);
 	StackInitDefault_ (&spu->callStack);
 	PrintSuccessMessage ("Starting execution...", NULL);
 
-  	while (ReadInstruction (spu) == NO_PROCESSOR_ERRORS);
+  	while (ReadInstruction (spu, &breakpointsBuffer, &debugInfoBuffer, &sourceText) == NO_PROCESSOR_ERRORS);
 
   	StackDestruct_ (&spu->processorStack);
 	StackDestruct_ (&spu->callStack);
 
+	DestroyBuffer (&debugInfoBuffer);
+	DestroyBuffer (&breakpointsBuffer);
+
+	DestroyFileBuffer (&sourceData);
+	free (sourceText.lines);
+
   	RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode ReadHeader (SPU *spu) {
+static ProcessorErrorCode ReadHeader (SPU *spu, Header *readHeader) {
 	PushLog (2);
 
 	custom_assert (spu, pointer_is_null, NO_PROCESSOR);
 
 	Header mainHeader {};
-    Header readHeader {};
     InitHeader (&mainHeader);
+    ReadData (spu, readHeader, Header);
 
-    ReadData (spu, &readHeader, Header);
+	ShrinkBytecodeBuffer (spu, spu->ip);
 
-	RETURN CheckHeader (&readHeader);
+	RETURN CheckHeader (readHeader);
 }
 
-static ProcessorErrorCode ReadInstruction (SPU *spu) {
+static ProcessorErrorCode ReadDebugInfo (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, size_t commandsCount) {
+	PushLog (2);
+
+	ProgramErrorCheck (InitBuffer (debugInfoBuffer, commandsCount), "Error occuried while initializing debug info buffer");
+	ReadArrayData (spu, debugInfoBuffer->data, commandsCount, DebugInfoChunk);
+	debugInfoBuffer->currentIndex = debugInfoBuffer->capacity;
+
+	spu->bytecode.buffer      +=           spu->ip;
+	spu->bytecode.buffer_size -= (ssize_t) spu->ip;
+	spu->ip = 0;
+
+	ShrinkBytecodeBuffer (spu, spu->ip);
+
+	RETURN NO_PROCESSOR_ERRORS;
+}
+
+static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *breakpointsBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, TextBuffer *sourceText) {
 	PushLog (2);
 
 	CheckBuffer (spu);
+
+	DebugInfoChunk breakpointByAddress = {spu->ip, -1};
+	const DebugInfoChunk *foundBreakpoint = FindValueInBuffer (breakpointsBuffer, &breakpointByAddress, DebugInfoChunkComparatorByAddress);
+	if (foundBreakpoint) {
+		BreakpointStop (spu, debugInfoBuffer, breakpointsBuffer, foundBreakpoint, sourceText);
+	}
 
 	CommandCode commandCode{0, 0};
 	ReadData (spu, &commandCode, CommandCode);
@@ -76,7 +123,7 @@ static ProcessorErrorCode ReadInstruction (SPU *spu) {
 	GetArguments (spu, instruction, &commandCode, &argumentPointer);
 
 	#ifndef _NDEBUG
-        char message [128] = "";
+        char message [MAX_MESSAGE_LENGTH] = "";
         sprintf (message, "Reading command %s", instruction->instructionName);
         PrintInfoMessage (message, NULL);
     #endif

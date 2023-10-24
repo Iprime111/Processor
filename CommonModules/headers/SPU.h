@@ -14,9 +14,13 @@ const unsigned int MIN_FREQUENCY = 1;           // minimal and maximal frequency
 const unsigned int MAX_FREQUENCY = 4200;
 const useconds_t MAX_SLEEP_TIME = (int) 20e6;   // Sleep time when minimal frequency is set
 
+struct DebugInfoChunk {
+    size_t address;
+    int line;
+};
 
 struct SPU {
-    FileBuffer *bytecode;
+    FileBuffer bytecode;
     size_t ip = 0;
 
     Stack processorStack = {};
@@ -32,5 +36,11 @@ struct SPU {
 };
 
 #undef REGISTER
+
+inline void ShrinkBytecodeBuffer (SPU *spu, size_t shrinkLength) {
+    spu->bytecode.buffer      +=            shrinkLength;
+    spu->bytecode.buffer_size -= (ssize_t) (shrinkLength);
+    spu->ip = 0;
+}
 
 #endif

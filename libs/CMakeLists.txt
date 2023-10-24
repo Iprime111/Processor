@@ -1,0 +1,5 @@
+add_subdirectory (ColorConsole)
+add_subdirectory (ConsoleParser)
+add_subdirectory (SimpleStack)
+add_subdirectory (CustomAssert)
+add_subdirectory (FileIO)

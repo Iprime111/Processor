@@ -20,11 +20,6 @@ mul     ; compute 4ac
 sub
 out     ; compute and print D
 
-push rax+1
-out     ; compute and print a + 1
-
-jmp Begin   ; jump test
-
 hlt     ; terminate program
 
 

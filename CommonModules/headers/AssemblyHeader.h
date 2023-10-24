@@ -3,7 +3,6 @@
 
 #include <endian.h>
 
-#include "Buffer.h"
 #include "CommonModules.h"
 
 #if BYTE_ORDER == LITTLE_ENDIAN
@@ -17,8 +16,11 @@ const short int DEFAULT_SIGNATURE = 0x4d54;
 
 struct Header {
     unsigned short signature = 0;
-    char version [sizeof (VERSION)];
-    char byteOrder [sizeof (SYSTEM_BYTE_ORDER)];
+
+    char version   [sizeof (VERSION)]           = "";
+    char byteOrder [sizeof (SYSTEM_BYTE_ORDER)] = "";
+
+    size_t commandsCount = 0;
 };
 
 #define WriteHeaderField(buffer, header, field, fieldSize)                                                                  \

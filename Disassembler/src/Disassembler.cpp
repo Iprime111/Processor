@@ -78,9 +78,14 @@ static ProcessorErrorCode ReadHeader (Buffer <char> *headerBuffer, SPU *spu) {
 
     ProgramErrorCheck (CheckHeader (&readHeader), "Header is corrupted");
 
-    WriteHeaderField (headerBuffer, &readHeader, signature, sizeof (unsigned short));
-    WriteHeaderField (headerBuffer, &readHeader, version,   sizeof (VERSION) - 1);
-    WriteHeaderField (headerBuffer, &readHeader, byteOrder, sizeof (SYSTEM_BYTE_ORDER) - 1);
+    WriteHeaderField (headerBuffer, &readHeader, signature,     sizeof (unsigned short));
+    WriteHeaderField (headerBuffer, &readHeader, version,       sizeof (VERSION) - 1);
+    WriteHeaderField (headerBuffer, &readHeader, byteOrder,     sizeof (SYSTEM_BYTE_ORDER) - 1);
+
+    // TODO
+    //WriteHeaderField (headerBuffer, &readHeader, commandsCount, sizeof (size_t));
+
+    ShrinkBytecodeBuffer (spu, sizeof (Header) + sizeof (DebugInfoChunk) * readHeader.commandsCount);
 
     WriteDataToBufferErrorCheck ("Error occuried while writing new line to header buffer", headerBuffer, "\n\n", 2);
 
@@ -98,7 +103,7 @@ static ProcessorErrorCode CreateDisassemblyBuffers (Buffer <char> *disassemblyBu
     // ip     line
     //0000\t  push ...
     //worst case: 1 byte of instruction = 9 bytes of symbols + '\n' symbol = 10 bytes
-    ProgramErrorCheck (InitBuffer (disassemblyBuffer, (size_t) spu->bytecode->buffer_size * 10 + sizeof (Header)), "Unable to create disassembly buffer");
+    ProgramErrorCheck (InitBuffer (disassemblyBuffer, (size_t) spu->bytecode.buffer_size * 10 + sizeof (Header)), "Unable to create disassembly buffer");
 
     // Creating header file
     // size: header size + 100
@@ -176,7 +181,7 @@ static ProcessorErrorCode ReadInstruction (Buffer <char> *disassemblyBuffer, SPU
 
     char commandLine [MAX_INSTRUCTION_LENGTH] = "";
     int bytesPrinted = 0;
-    sprintf (commandLine, "%.4lu\t%s%n", spu->ip - sizeof (commandCode) - sizeof (Header), instruction->instructionName, &bytesPrinted);
+    sprintf (commandLine, "%.4lu\t%s%n", spu->ip - sizeof (commandCode), instruction->instructionName, &bytesPrinted);
 
     ProcessorErrorCode errorCode = ReadArguments (instruction, &commandCode, spu, commandLine + bytesPrinted);
     if (errorCode != NO_PROCESSOR_ERRORS) {

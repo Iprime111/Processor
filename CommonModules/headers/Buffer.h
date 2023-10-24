@@ -1,10 +1,10 @@
 #ifndef BUFFER_H_
 #define BUFFER_H_
 
+#include <cstdlib>
 #include <stdlib.h>
 #include <stddef.h>
 
-#include "CommonModules.h"
 #include "Logger.h"
 #include "MessageHandler.h"
 
@@ -35,7 +35,12 @@ ProcessorErrorCode WriteDataToBuffer (Buffer <T> *buffer, const void *data, size
   	custom_assert (data,   pointer_is_null, NO_BUFFER);
 
   	if (dataSize > buffer->capacity - buffer->currentIndex) {
-    	ProgramErrorCheck (BUFFER_ENDED, "Too many data to write into the buffer");
+		buffer->capacity *= 2;
+		buffer->data = (T *) reallocarray (buffer->data, buffer->capacity, sizeof (T));
+
+		if (!buffer->data) {
+			ProgramErrorCheck (BUFFER_ENDED, "Too many data to write into the buffer (reallocation error)");
+		}
   	}
 
   	for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++) {

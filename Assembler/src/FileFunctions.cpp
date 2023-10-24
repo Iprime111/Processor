@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <ctype.h>
 #include <string.h>
 #include <unistd.h>
@@ -10,83 +11,79 @@
 #include "Logger.h"
 #include "TextTypes.h"
 
-ProcessorErrorCode DeleteExcessWhitespaces (TextBuffer *lines) {
-    PushLog (3);
+static ProcessorErrorCode WriteHeader    (int binaryDescriptor, int listingDescriptor, size_t commandsCount);
+static ProcessorErrorCode WriteDebugInfo (int binaryDescriptor, int listingDescriptor, Buffer <DebugInfoChunk> *debugInfoBuffer);
 
-    custom_assert (lines,        pointer_is_null, NO_BUFFER);
-    custom_assert (lines->lines, pointer_is_null, NO_BUFFER);
-
-    for (size_t lineIndex = 0; lineIndex < lines->line_count; lineIndex++) {
-        TextLine *currentLine = lines->lines + lineIndex;
-
-        bool metWhitespace = false;
-        char *writingPointer = currentLine->pointer;
-
-        for (size_t symbolIndex = 0; symbolIndex < currentLine->length; symbolIndex++) {
-            if (isspace (currentLine->pointer [symbolIndex])) {
-                if (!metWhitespace) {
-                    metWhitespace = true;
-                } else {
-                    continue;
-                }
-
-            } else {
-                metWhitespace = false;
-            }
-
-            *writingPointer = currentLine->pointer [symbolIndex];
-            writingPointer++;
-        }
-
-        *writingPointer = '\0';
-        currentLine->length = (size_t) (writingPointer - currentLine->pointer);
-    }
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-ProcessorErrorCode WriteDataToFiles (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, int binaryDescriptor, int listingDescriptor) {
+ProcessorErrorCode WriteDataToFiles (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, int binaryDescriptor, int listingDescriptor) {
     PushLog (2);
 
     custom_assert (binaryBuffer,           pointer_is_null,   NO_BUFFER);
     custom_assert (listingBuffer,          pointer_is_null,   NO_BUFFER);
     custom_assert (binaryDescriptor != -1, invalid_arguments, OUTPUT_FILE_ERROR);
 
-    ProgramErrorCheck (WriteHeader (binaryDescriptor, listingDescriptor), "Error occuried while writing header");
+    ProgramErrorCheck (WriteHeader    (binaryDescriptor, listingDescriptor, debugInfoBuffer->capacity), "Error occuried while writing header");
+    ProgramErrorCheck (WriteDebugInfo (binaryDescriptor, listingDescriptor, debugInfoBuffer),           "Error occuried while writing debug info");
 
     if (!WriteBuffer (binaryDescriptor, binaryBuffer->data, (ssize_t) binaryBuffer->currentIndex)) {
         ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing to binary file");
     }
 
-    if (listingDescriptor != -1) {
-        const char *ListingLegend = " ip \topcode\tline \tsource\n";
+    if (listingDescriptor == -1) {
+        RETURN NO_PROCESSOR_ERRORS;
+    }
 
-        if (!WriteBuffer (listingDescriptor, ListingLegend, (ssize_t) strlen (ListingLegend))) {
-            ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing to listing file");
-        }
+    const char *ListingLegend = " ip \topcode\tline \tsource\n";
 
-        if (!WriteBuffer (listingDescriptor, listingBuffer->data, (ssize_t) listingBuffer->currentIndex)) {
-            ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing to listing file");
-        }
+    if (!WriteBuffer (listingDescriptor, ListingLegend, (ssize_t) strlen (ListingLegend))) {
+        ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing to a listing file");
+    }
+
+    if (!WriteBuffer (listingDescriptor, listingBuffer->data, (ssize_t) listingBuffer->currentIndex)) {
+        ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing to a listing file");
     }
 
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescriptor) {
+static ProcessorErrorCode WriteDebugInfo (int binaryDescriptor, int listingDescriptor, Buffer <DebugInfoChunk> *debugInfoBuffer) {
+    PushLog (2);
+
+    if (!WriteBuffer (binaryDescriptor, (char *) debugInfoBuffer->data, (ssize_t) (debugInfoBuffer->capacity * sizeof (DebugInfoChunk)))) {
+        ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing debug info to a binary file");
+    }
+
+    if (listingDescriptor == -1) {
+        RETURN NO_PROCESSOR_ERRORS;
+    }
+
+    const char DebugInfoLegend [] = "DEBUG INFO:\n";
+
+    if (!WriteBuffer (listingDescriptor, DebugInfoLegend, sizeof (DebugInfoLegend) - 1)) {
+        ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing header to listing file");
+    }
+
+    // TODO write debug info to listing
+
+    RETURN NO_PROCESSOR_ERRORS;
+}
+
+static ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescriptor, size_t commandsCount) {
     PushLog (2);
     custom_assert (binaryDescriptor != -1, invalid_arguments, OUTPUT_FILE_ERROR);
 
     Header header {};
     InitHeader (&header);
 
+    header.commandsCount = commandsCount;
+
     if (!WriteBuffer (binaryDescriptor, (char *) &header, sizeof (header))) {
-        ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing header to binary file");
+        ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing header to a binary file");
     }
 
     if (listingDescriptor == -1) {
         RETURN NO_PROCESSOR_ERRORS;
     }
+
     const char HeaderLegend [] = "HEADER:\n";
 
     if (!WriteBuffer (listingDescriptor, HeaderLegend, (ssize_t) sizeof (HeaderLegend) - 1)) {
@@ -98,9 +95,12 @@ ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescriptor) {
     Buffer <char> listingHeaderBuffer {};
     InitBuffer (&listingHeaderBuffer, sizeof (header) * ListingHeaderBufferMaxSize);
 
-    WriteHeaderField (&listingHeaderBuffer, &header, signature, sizeof (unsigned short));
-    WriteHeaderField (&listingHeaderBuffer, &header, version,   sizeof (VERSION) - 1);
-    WriteHeaderField (&listingHeaderBuffer, &header, byteOrder, sizeof (SYSTEM_BYTE_ORDER) - 1);
+    WriteHeaderField (&listingHeaderBuffer, &header, signature,     sizeof (unsigned short));
+    WriteHeaderField (&listingHeaderBuffer, &header, version,       sizeof (VERSION) - 1);
+    WriteHeaderField (&listingHeaderBuffer, &header, byteOrder,     sizeof (SYSTEM_BYTE_ORDER) - 1);
+
+    // TODO rewrite this macro
+    //WriteHeaderField (&listingHeaderBuffer, &header, commandsCount, sizeof (size_t));
 
     WriteDataToBufferErrorCheck ("Error occuried while writing new line to listing file", &listingHeaderBuffer, "\n\n", strlen ("\n\n"));
 

@@ -1,6 +1,6 @@
 .PHONY: all, test-assembler, test-disassembler, test-processor
 
-TestFile = ../tests/test3.asm
+TestFile = ../tests/test2.asm
 
 default: all
 

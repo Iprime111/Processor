@@ -29,6 +29,7 @@ enum ProcessorErrorCode {
     WRONG_HEADER        = 1 << 12,
     WRONG_LABEL         = 1 << 13,
     WRONG_FREQUENCY     = 1 << 14,
+    WRONG_LINE          = 1 << 15,
 };
 
 enum ArgumentsType {
@@ -70,7 +71,6 @@ const AssemblerInstruction *FindInstructionByName   (char *name);
 const AssemblerInstruction *FindInstructionByOpcode (int instruction);
 
 bool CopyVariableValue (void *destination, void *source, size_t size);
-char *convertToString ();
 
 #ifndef _NDEBUG
     #define ON_DEBUG(...) __VA_ARGS__
