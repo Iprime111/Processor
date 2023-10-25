@@ -5,7 +5,6 @@
 #include "CommonModules.h"
 #include "CustomAssert.h"
 #include "FileIO.h"
-#include "Logger.h"
 #include "MessageHandler.h"
 #include "Registers.h"
 #include "Stack/StackPrintf.h"
@@ -82,10 +81,11 @@ static ProcessorErrorCode ReadHeader (Buffer <char> *headerBuffer, SPU *spu) {
     WriteHeaderField (headerBuffer, &readHeader, version,       sizeof (VERSION) - 1);
     WriteHeaderField (headerBuffer, &readHeader, byteOrder,     sizeof (SYSTEM_BYTE_ORDER) - 1);
 
-    // TODO
-    //WriteHeaderField (headerBuffer, &readHeader, commandsCount, sizeof (size_t));
+    ShrinkBytecodeBuffer (spu, sizeof (Header));
 
-    ShrinkBytecodeBuffer (spu, sizeof (Header) + sizeof (DebugInfoChunk) * readHeader.commandsCount);
+    if (readHeader.hasDebugInfo) {
+        ShrinkBytecodeBuffer (spu, sizeof (DebugInfoChunk) * readHeader.commandsCount);
+    }
 
     WriteDataToBufferErrorCheck ("Error occuried while writing new line to header buffer", headerBuffer, "\n\n", 2);
 

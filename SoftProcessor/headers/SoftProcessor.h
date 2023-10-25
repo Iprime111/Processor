@@ -4,6 +4,6 @@
 #include "CommonModules.h"
 #include "TextTypes.h"
 
-ProcessorErrorCode ExecuteFile (SPU *spu, char *sourceFilename);
+ProcessorErrorCode LaunchProgram (SPU *spu, char *sourceFilename, char *binaryFilename);
 
 #endif

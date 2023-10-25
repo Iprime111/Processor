@@ -5,6 +5,8 @@
 #include "AssemblyHeader.h"
 #include "DSLFunctions.h"
 
+static bool DebugMode = false;
+
 ProcessorErrorCode CheckHeader (Header *header) {
 	PushLog (2);
 
@@ -36,5 +38,20 @@ ProcessorErrorCode InitHeader (Header *header) {
     strcpy (header->byteOrder, SYSTEM_BYTE_ORDER);
     header->signature = DEFAULT_SIGNATURE;
 
+    header->hasDebugInfo = DebugMode;
+
     RETURN NO_PROCESSOR_ERRORS;
+}
+
+void SetDebugMode (bool debugMode) {
+    PushLog (4);
+
+    DebugMode = debugMode;
+
+    RETURN;
+}
+
+bool IsDebugMode () {
+    PushLog (4);
+    RETURN DebugMode;
 }

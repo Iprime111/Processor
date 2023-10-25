@@ -11,7 +11,7 @@
     const char SYSTEM_BYTE_ORDER [] = "BIG ENDIAN";
 #endif
 
-const char VERSION [] = "1.4.0";
+const char VERSION [] = "1.5.5";
 const short int DEFAULT_SIGNATURE = 0x4d54;
 
 struct Header {
@@ -20,6 +20,7 @@ struct Header {
     char version   [sizeof (VERSION)]           = "";
     char byteOrder [sizeof (SYSTEM_BYTE_ORDER)] = "";
 
+    bool hasDebugInfo    = false;
     size_t commandsCount = 0;
 };
 
@@ -36,5 +37,8 @@ struct Header {
 
 ProcessorErrorCode InitHeader  (Header *header);
 ProcessorErrorCode CheckHeader (Header *header);
+
+void SetDebugMode (bool debugMode);
+bool IsDebugMode  ();
 
 #endif

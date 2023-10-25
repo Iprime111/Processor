@@ -15,10 +15,11 @@ enum DebuggerAction {
     RUN_PROGRAM             = 1,
     QUIT_PROGRAM            = 2,
     CONTINUE_PROGRAM        = 3,
+    STEP_PROGRAM            = 4,
 };
 
 ProcessorErrorCode InitDebugConsole ();
-ProcessorErrorCode ReadSourceFile   (FileBuffer *file, TextBuffer *text, char *filename);
+ProcessorErrorCode ReadSourceFile   (FileBuffer *file, TextBuffer *text, const char *filename);
 
 DebuggerAction DebugConsole   (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer);
 DebuggerAction BreakpointStop (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, const DebugInfoChunk *breakpointData, TextBuffer *text);

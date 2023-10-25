@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 const size_t REGISTER_COUNT           = 4;
-const size_t MAX_REGISTER_NAME_LENGTH = 3;
+const size_t MAX_REGISTER_NAME_LENGTH = 7;
 
 struct Register {
     const char   *name  = NULL;

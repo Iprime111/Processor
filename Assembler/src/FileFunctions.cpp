@@ -48,6 +48,10 @@ ProcessorErrorCode WriteDataToFiles (Buffer <char> *binaryBuffer, Buffer <char> 
 static ProcessorErrorCode WriteDebugInfo (int binaryDescriptor, int listingDescriptor, Buffer <DebugInfoChunk> *debugInfoBuffer) {
     PushLog (2);
 
+    if (!IsDebugMode ()) {
+        RETURN NO_PROCESSOR_ERRORS;
+    }
+
     if (!WriteBuffer (binaryDescriptor, (char *) debugInfoBuffer->data, (ssize_t) (debugInfoBuffer->capacity * sizeof (DebugInfoChunk)))) {
         ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing debug info to a binary file");
     }

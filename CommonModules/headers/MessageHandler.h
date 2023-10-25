@@ -5,7 +5,7 @@
 #include "SecureStack/SecureStack.h"
 #include "TextTypes.h"
 
-const size_t MAX_MESSAGE_LENGTH = 128;
+const size_t MAX_MESSAGE_LENGTH = 256;
 
 struct ProcessorMessage {
     const ProcessorErrorCode errorCode;

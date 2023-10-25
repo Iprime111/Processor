@@ -165,7 +165,7 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
     ProgramErrorCheck (EmitInstructionBinary  (binaryBuffer,                &outputInstruction, &arguments, line, lineNumber), "Error occuried while emitting instruction to a binary");
     ProgramErrorCheck (EmitInstructionListing (binaryBuffer, listingBuffer, &outputInstruction, &arguments, line, lineNumber), "Error occuried while emitting instruction to a listing");
 
-    if (debugInfoBuffer) {
+    if (debugInfoBuffer && IsDebugMode ()) {
         DebugInfoChunk commandDebugInfo = {binaryBuffer->currentIndex, lineNumber};
         ProgramErrorCheck (WriteDataToBuffer (debugInfoBuffer, &commandDebugInfo, 1), "Error occuried while writing debug information to a buffer");
     }

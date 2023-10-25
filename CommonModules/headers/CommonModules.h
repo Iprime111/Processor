@@ -30,6 +30,8 @@ enum ProcessorErrorCode {
     WRONG_LABEL         = 1 << 13,
     WRONG_FREQUENCY     = 1 << 14,
     WRONG_LINE          = 1 << 15,
+    RESET_PROCESSOR     = 1 << 16,
+    FORK_ERROR          = 1 << 17,
 };
 
 enum ArgumentsType {

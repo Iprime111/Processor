@@ -35,6 +35,9 @@ ProcessorErrorCode WriteDataToBuffer (Buffer <T> *buffer, const void *data, size
   	custom_assert (data,   pointer_is_null, NO_BUFFER);
 
   	if (dataSize > buffer->capacity - buffer->currentIndex) {
+		if (buffer->capacity == 0)
+			buffer->capacity = 1;
+
 		buffer->capacity *= 2;
 		buffer->data = (T *) reallocarray (buffer->data, buffer->capacity, sizeof (T));
 

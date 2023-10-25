@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
+#include "AssemblyHeader.h"
 #include "CommonModules.h"
 #include "CustomAssert.h"
 #include "FileIO.h"
@@ -17,15 +19,11 @@
 static char      *BinaryFile           = NULL;
 static char      *SourceFile           = NULL;
 static useconds_t FrequencyTime        = 0;
-static bool       DebugMode            = false;
-static bool       DisassemblyGenerated = false;
 
 void AddBinary       (char **arguments);
 void AddSource       (char **arguments);
 void SetFrequency    (char **arguments);
 void EnableDebugMode (char **arguments);
-
-ProcessorErrorCode GenerateDisassembly ();
 
 static bool PrepareForExecuting (FileBuffer *fileBuffer);
 
@@ -33,6 +31,7 @@ int main (int argc, char **argv){
     PushLog (1);
 
     SetGlobalMessagePrefix ("Processor");
+    SetDebugMode (false);
 
     //Process console line arguments
     register_flag ("-b", "--binary",    AddBinary,       1);
@@ -46,11 +45,11 @@ int main (int argc, char **argv){
 
     if (PrepareForExecuting (&fileBuffer)){
         SPU spu {
-            .bytecode = fileBuffer,
+            .bytecode       = fileBuffer,
             .frequencySleep = FrequencyTime,
         };
 
-        ExecuteFile (&spu, SourceFile);
+        LaunchProgram (&spu, SourceFile, BinaryFile);
     }
 
     DestroyFileBuffer (&fileBuffer);
@@ -73,10 +72,6 @@ static bool PrepareForExecuting (FileBuffer *fileBuffer) {
     if (!ReadFile (BinaryFile, fileBuffer)) {
         PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while reading binary", NULL, NULL, -1);
         RETURN false;
-    }
-
-    if (DebugMode && !SourceFile) {
-        GenerateDisassembly ();
     }
 
     RETURN true;
@@ -137,14 +132,7 @@ void SetFrequency (char **arguments) {
 void EnableDebugMode (char **arguments) {
     PushLog (3);
 
-    DebugMode = true;
+    SetDebugMode (true);
 
     RETURN;
-}
-
-ProcessorErrorCode GenerateDisassembly () {
-    PushLog (2);
-    // TODO disassembly
-
-    RETURN NO_PROCESSOR_ERRORS;
 }

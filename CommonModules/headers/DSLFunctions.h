@@ -26,7 +26,7 @@ inline ComparisonResult CompareValues (elem_t value1, elem_t value2) {
 
 #define CheckBuffer(spu)                                                                                   \
             do {                                                                                           \
-                custom_assert ((spu)->bytecode.buffer,                   pointer_is_null, NO_BUFFER);      \
+                custom_assert ((spu)->bytecode.buffer,           pointer_is_null, NO_BUFFER);              \
                 custom_assert ((spu)->bytecode.buffer_size >= 0, invalid_value,   BUFFER_ENDED);           \
             }while (0)
 

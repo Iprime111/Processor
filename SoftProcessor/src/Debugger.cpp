@@ -1,6 +1,12 @@
-#include <cstdio>
+#include <cstddef>
+#include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 #include <string.h>
+
+#undef RETURN
 
 #include "Buffer.h"
 #include "CommonModules.h"
@@ -15,7 +21,6 @@
 #include "StringProcessing.h"
 #include "TextTypes.h"
 
-static ProcessorErrorCode ShowCustomPromptLine ();
 static ProcessorErrorCode PlaceBreakpoint  (SPU *spu, char *arguments, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer);
 static ProcessorErrorCode PrintSpuData     (SPU *spu, char *arguments);
 
@@ -23,6 +28,7 @@ static void PrintMemoryValue      (SPU *spu, ssize_t address, char *arguments);
 static void PrintRegister         (SPU *spu, unsigned char registerIndex, char *registerName);
 static void PrintRegisterAndImmed (SPU *spu, unsigned char registerIndex, elem_t value);
 static void PrintImmed            (elem_t value);
+static void DumpMemory            ();
 
 static bool HasRamBrackets (TextLine *arguments);
 static void ShowDebuggerLogo (FILE *stream);
@@ -32,7 +38,7 @@ static char DEBUGGER_ERROR_PREFIX [] = "Debugger";
 ProcessorErrorCode InitDebugConsole () {
     PushLog (3);
 
-    fprintf (stderr, CLEAR_SCREEN());
+    //fprintf (stderr, CLEAR_SCREEN());
     ShowDebuggerLogo (stderr);
 
     RETURN NO_PROCESSOR_ERRORS;
@@ -49,43 +55,47 @@ DebuggerAction BreakpointStop (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffe
 DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer) {
     PushLog (2);
 
-    Buffer <char> commandBuffer = {0, 0, NULL};
-
     #define DestroyBufferAndReturn(returnValue) \
-            DestroyBuffer (&commandBuffer);     \
+            free (input);                       \
             RETURN returnValue;                 \
 
     while (true) {
-        ShowCustomPromptLine ();
-        getline (&commandBuffer.data, &commandBuffer.capacity, stdin);
+        char *input = readline ("Assembly debugger" BOLD_WHITE_COLOR " # " WHITE_COLOR);
+
+        add_history (input);
 
         char commandName [MAX_DEBUGGER_COMMAND_LENGTH] = "";
         int commandNameLength = 0;
-        sscanf (commandBuffer.data, "%s%n", commandName, &commandNameLength);
+        sscanf (input, "%s%n", commandName, &commandNameLength);
 
-        char *argumentsLine = commandBuffer.data + commandNameLength;
+        char *argumentsLine = input + commandNameLength;
 
         #define DEBUGGER_COMMAND_(name, shortName, ...)                               \
             if (!strcmp (commandName, name) || !strcmp (commandName, shortName)) {    \
                 __VA_ARGS__;                                                          \
             }                                                                         \
 
-        //TODO error detection
         DEBUGGER_COMMAND_ ("quit",       "q", DestroyBufferAndReturn (QUIT_PROGRAM))
         DEBUGGER_COMMAND_ ("continue",   "c", DestroyBufferAndReturn (CONTINUE_PROGRAM));
         DEBUGGER_COMMAND_ ("run",        "r", DestroyBufferAndReturn (RUN_PROGRAM));
-        DEBUGGER_COMMAND_ ("print",      "p", PrintSpuData    (spu, argumentsLine));
-        DEBUGGER_COMMAND_ ("breakpoint", "b", PlaceBreakpoint (spu, argumentsLine, debugInfoBuffer, breakpointsBuffer));
+        DEBUGGER_COMMAND_ ("step",       "s", DestroyBufferAndReturn (STEP_PROGRAM));
+        DEBUGGER_COMMAND_ ("print",      "p", {PrintSpuData    (spu, argumentsLine);                                     free (input); continue;});
+        DEBUGGER_COMMAND_ ("breakpoint", "b", {PlaceBreakpoint (spu, argumentsLine, debugInfoBuffer, breakpointsBuffer); free (input); continue;});
+        DEBUGGER_COMMAND_ ("memory",     "m", {DumpMemory();                                                             free (input); continue;});
+        DEBUGGER_COMMAND_ ("telescope",  "t", {DumpStackData (&spu->processorStack);                                     free (input); continue;});
+
+        PrintErrorMessage (NO_PROCESSOR_ERRORS, "Please enter valid command", DEBUGGER_ERROR_PREFIX, NULL, -1);
 
         #undef DEBUGGER_COMMAND_
+
+        free (input);
+        #undef DestroyBufferAndReturn
     }
 
-    DestroyBufferAndReturn (CONTINUE_PROGRAM);
 
-    #undef DestroyBufferAndReturn
 }
 
-ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, char *filename) {
+ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, const char *filename) {
     PushLog (3);
 
 	if (!CreateFileBuffer (fileBuffer, filename)) {
@@ -103,6 +113,9 @@ ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, cha
     RETURN NO_PROCESSOR_ERRORS;
 }
 
+static void DumpMemory () {
+
+}
 
 static ProcessorErrorCode PrintSpuData (SPU *spu, char *arguments) {
     PushLog (3);
@@ -113,14 +126,17 @@ static ProcessorErrorCode PrintSpuData (SPU *spu, char *arguments) {
     bool isRamValue = HasRamBrackets (&argumentsLine);
     if (isRamValue) {
         argumentsLine.length--;
-        argumentsLine.pointer [argumentsLine.length - 1] = '\0';
+        argumentsLine.pointer [argumentsLine.length] = '\0';
         argumentsLine.pointer++;
     }
 
-    #define FIND_REGISTER()                                                         \
-            const Register *foundRegister = FindRegisterByName (registerName);      \
-            if (foundRegister) {                                                    \
-                registerIndex = foundRegister->index;                               \
+    #define FIND_REGISTER()                                                                                     \
+            const Register *foundRegister = FindRegisterByName (registerName);                                  \
+            if (foundRegister) {                                                                                \
+                registerIndex = foundRegister->index;                                                           \
+            } else {                                                                                            \
+                PrintErrorMessage (NO_PROCESSOR_ERRORS, "Wrong register name", DEBUGGER_ERROR_PREFIX, NULL, -1);\
+                RETURN TOO_FEW_ARGUMENTS;                                                                       \
             }
 
     elem_t value = 0;
@@ -140,13 +156,15 @@ static ProcessorErrorCode PrintSpuData (SPU *spu, char *arguments) {
             PrintImmed (value);
 
     } else if (sscanf (argumentsLine.pointer, "%3s", registerName) > 0) {
+        FIND_REGISTER ();
+
         if (!isRamValue)
             PrintRegister (spu, registerIndex, registerName);
         else
             value = spu->registerValues [registerIndex];
 
     } else {
-        PrintErrorMessage (TOO_FEW_ARGUMENTS, "Wrong arguments prompt", DEBUGGER_ERROR_PREFIX, NULL, -1);
+        PrintErrorMessage (NO_PROCESSOR_ERRORS, "Wrong arguments prompt", DEBUGGER_ERROR_PREFIX, NULL, -1);
         RETURN TOO_FEW_ARGUMENTS;
     }
 
@@ -195,28 +213,28 @@ static bool HasRamBrackets (TextLine *arguments) {
 static ProcessorErrorCode PlaceBreakpoint (SPU *spu, char *arguments, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer) {
     PushLog (3);
 
-    int lineNumber = -1;
-    if (sscanf (arguments, "%d", &lineNumber) <= 0) {
-        PrintErrorMessage (WRONG_LINE, "Please enter valid line number", DEBUGGER_ERROR_PREFIX, NULL, -1);
+    DebugInfoChunk patternBreakpoint = {};
+    DebugInfoChunk *foundAddress = NULL;
+
+    arguments = strtok (arguments, " ");
+
+    if (arguments [0] == '*' && sscanf (arguments + 1, "%lu", &patternBreakpoint.address) > 0) {
+        foundAddress = FindValueInBuffer (debugInfoBuffer, &patternBreakpoint, DebugInfoChunkComparatorByAddress);
+
+    } else if (sscanf (arguments, "%d", &patternBreakpoint.line) > 0) {
+        foundAddress = FindValueInBuffer (debugInfoBuffer, &patternBreakpoint, DebugInfoChunkComparatorByLine);
+
+    } else {
+        PrintErrorMessage (WRONG_LINE, "Please enter valid line number or bytecode address", DEBUGGER_ERROR_PREFIX, NULL, -1);
         RETURN WRONG_LINE;
     }
 
-    DebugInfoChunk lineByNumber = {0, lineNumber};
-    const DebugInfoChunk *foundAddress = FindValueInBuffer (debugInfoBuffer, &lineByNumber, DebugInfoChunkComparatorByLine);
     if (!foundAddress) {
-        PrintErrorMessage (WRONG_LINE, "Please enter valid line number", DEBUGGER_ERROR_PREFIX, NULL, -1);
+        PrintErrorMessage (WRONG_LINE, "Please enter valid line number or bytecode address", DEBUGGER_ERROR_PREFIX, NULL, -1);
         RETURN WRONG_LINE;
     }
 
     WriteDataToBuffer (breakpointsBuffer, foundAddress, 1);
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-static ProcessorErrorCode ShowCustomPromptLine () {
-    PushLog (4);
-
-    fprintf(stderr, WHITE_COLOR "Assembler debugger" BOLD_WHITE_COLOR " > ");
 
     RETURN NO_PROCESSOR_ERRORS;
 }

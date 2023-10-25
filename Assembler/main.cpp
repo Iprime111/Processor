@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <stdlib.h>
 
+#include "AssemblyHeader.h"
 #include "CommonModules.h"
 #include "ConsoleParser.h"
 #include "CustomAssert.h"
@@ -16,9 +17,10 @@ static char *SourceFile  = NULL;
 static char *ListingFile = NULL;
 static char *BinaryFile  = "a.out";
 
-void AddSource  (char **arguments);
-void AddBinary  (char **arguments);
-void AddListing (char **arguments);
+void AddSource       (char **arguments);
+void AddBinary       (char **arguments);
+void AddListing      (char **arguments);
+void EnableDebugMode (char **arguments);
 
 static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer, int *binaryDescriptor, int *listingDescriptor);
 
@@ -26,11 +28,13 @@ int main (int argc, char **argv) {
     PushLog (1);
 
     SetGlobalMessagePrefix ("Assembler");
+    SetDebugMode (false);
 
     //Process console line arguments
-    register_flag ("-s", "--source",  AddSource,  1);
-    register_flag ("-l", "--listing", AddListing, 1);
-    register_flag ("-o", "--output",  AddBinary,  1);
+    register_flag ("-s", "--source",  AddSource,       1);
+    register_flag ("-l", "--listing", AddListing,      1);
+    register_flag ("-o", "--output",  AddBinary,       1);
+    register_flag ("-d", "--debug",   EnableDebugMode, 0);
     parse_flags (argc, argv);
 
     //Process source files
@@ -135,4 +139,13 @@ static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer
 
     RETURN true;
 }
+
+void EnableDebugMode (char **arguments) {
+    PushLog (3);
+
+    SetDebugMode (true);
+
+    RETURN;
+}
+
 

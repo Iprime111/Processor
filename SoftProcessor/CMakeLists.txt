@@ -9,6 +9,7 @@ target_link_libraries (${PROJECT_NAME} PRIVATE CustomAssert)
 target_link_libraries (${PROJECT_NAME} PRIVATE ConsoleParser)
 target_link_libraries (${PROJECT_NAME} PRIVATE Stack)
 target_link_libraries (${PROJECT_NAME} PRIVATE FileIO)
+target_link_libraries (${PROJECT_NAME} PRIVATE readline)
 
 target_link_libraries (${PROJECT_NAME} PRIVATE CommonModules)
 
