@@ -1,3 +1,7 @@
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/System/Thread.hpp>
+#include <SFML/Window/Event.hpp>
+#include <SFML/Window/WindowStyle.hpp>
 #include <cstddef>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -14,6 +18,7 @@
 #include "SPU.h"
 #include "SoftProcessor.h"
 #include "TextTypes.h"
+#include "GraphicsProvider.h"
 #include "Stack/Stack.h"
 
 static char      *BinaryFile           = NULL;
@@ -26,6 +31,7 @@ void SetFrequency    (char **arguments);
 void EnableDebugMode (char **arguments);
 
 static bool PrepareForExecuting (FileBuffer *fileBuffer);
+void LaunchThread (SPU *spu);
 
 int main (int argc, char **argv){
     PushLog (1);
@@ -38,23 +44,47 @@ int main (int argc, char **argv){
     register_flag ("-s", "--source",    AddSource,       1);
     register_flag ("-f", "--frequency", SetFrequency,    1);
     register_flag ("-d", "--debug",     EnableDebugMode, 0);
-    parse_flags (argc, argv);
+    parse_flags   (argc, argv);
 
     //Read binary file
     FileBuffer fileBuffer = {};
 
-    if (PrepareForExecuting (&fileBuffer)){
-        SPU spu {
-            .bytecode       = fileBuffer,
-            .frequencySleep = FrequencyTime,
-        };
+    if (!PrepareForExecuting (&fileBuffer)) {
+        RETURN 0;
+    }
 
-        LaunchProgram (&spu, SourceFile, BinaryFile);
+    SPU spu = {
+        .bytecode       = fileBuffer,
+        .frequencySleep = FrequencyTime,
+    };
+
+    sf::Thread processorThread (&LaunchThread, &spu);
+    processorThread.launch ();
+
+    sf::RenderWindow window (sf::VideoMode (WINDOW_X_SIZE, WINDOW_Y_SIZE), "Processor Graphics", sf::Style::None);
+    window.setActive (false);
+
+    sf::Thread thread (&RenderingThread, &window);
+    thread.launch ();
+
+    while (window.isOpen ()) {
+        sf::Event event = {};
+
+        while (window.pollEvent (event))
+        {
+            if (event.type == sf::Event::Closed)
+                window.close();
+        }
+
     }
 
     DestroyFileBuffer (&fileBuffer);
 
     RETURN 0;
+}
+
+void LaunchThread (SPU *spu) {
+    LaunchProgram (spu, SourceFile, BinaryFile);
 }
 
 static bool PrepareForExecuting (FileBuffer *fileBuffer) {

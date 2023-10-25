@@ -178,7 +178,7 @@ static ProcessorErrorCode ReadDebugInfo (SPU *spu, Buffer <DebugInfoChunk> *debu
 	custom_assert (debugInfoBuffer, pointer_is_null, NO_BUFFER);
 	custom_assert (header, 			pointer_is_null, WRONG_HEADER);
 
-	if (!header->hasDebugInfo && IsDebugMode ()) {
+	if (!header->hasDebugInfo) {
 		RETURN NO_PROCESSOR_ERRORS;
 	}
 
