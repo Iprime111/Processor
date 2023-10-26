@@ -1,3 +1,8 @@
+#include <SFML/Graphics/RenderWindow.hpp>
+#include <SFML/System/Thread.hpp>
+#include <SFML/Window/Event.hpp>
+#include <SFML/Window/VideoMode.hpp>
+#include <SFML/Window/WindowStyle.hpp>
 #include <cstddef>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -9,23 +14,28 @@
 #include "CustomAssert.h"
 #include "FileIO.h"
 #include "ConsoleParser.h"
-#include "Logger.h"
 #include "MessageHandler.h"
 #include "SPU.h"
 #include "SoftProcessor.h"
 #include "TextTypes.h"
+#include "GraphicsProvider.h"
 #include "Stack/Stack.h"
 
 static char      *BinaryFile           = NULL;
 static char      *SourceFile           = NULL;
 static useconds_t FrequencyTime        = 0;
+static bool       IsGraphicsEnabled    = false;
+
+static sf::Mutex  WorkMutex            = {};
 
 void AddBinary       (char **arguments);
 void AddSource       (char **arguments);
 void SetFrequency    (char **arguments);
 void EnableDebugMode (char **arguments);
+void EnableGraphics  (char **arguments);
 
 static bool PrepareForExecuting (FileBuffer *fileBuffer);
+void LaunchThread (SPU *spu);
 
 int main (int argc, char **argv){
     PushLog (1);
@@ -38,23 +48,40 @@ int main (int argc, char **argv){
     register_flag ("-s", "--source",    AddSource,       1);
     register_flag ("-f", "--frequency", SetFrequency,    1);
     register_flag ("-d", "--debug",     EnableDebugMode, 0);
-    parse_flags (argc, argv);
+    register_flag ("-g", "--graphics",  EnableGraphics,  0);
+    parse_flags   (argc, argv);
 
     //Read binary file
     FileBuffer fileBuffer = {};
 
-    if (PrepareForExecuting (&fileBuffer)){
-        SPU spu {
-            .bytecode       = fileBuffer,
-            .frequencySleep = FrequencyTime,
-        };
-
-        LaunchProgram (&spu, SourceFile, BinaryFile);
+    if (!PrepareForExecuting (&fileBuffer)) {
+        RETURN 0;
     }
 
+    SPU spu = {
+        .bytecode        = fileBuffer,
+        .frequencySleep  = FrequencyTime,
+        .graphicsEnabled = IsGraphicsEnabled,
+        .isWorking       = true,
+    };
+
+    sf::Thread processorThread (&LaunchThread, &spu);
+    processorThread.launch ();
+
+    if (IsGraphicsEnabled) {
+        sf::RenderWindow window (sf::VideoMode (WINDOW_X_SIZE, WINDOW_Y_SIZE), "RAM graphics", sf::Style::None);
+
+        RenderLoop (&window, &spu, &WorkMutex);
+    }
+
+    processorThread.wait ();
     DestroyFileBuffer (&fileBuffer);
 
     RETURN 0;
+}
+
+void LaunchThread (SPU *spu) {
+    LaunchProgram (spu, SourceFile, BinaryFile, &WorkMutex);
 }
 
 static bool PrepareForExecuting (FileBuffer *fileBuffer) {
@@ -133,6 +160,14 @@ void EnableDebugMode (char **arguments) {
     PushLog (3);
 
     SetDebugMode (true);
+
+    RETURN;
+}
+
+void EnableGraphics  (char **arguments) {
+    PushLog (3);
+
+    IsGraphicsEnabled = true;
 
     RETURN;
 }

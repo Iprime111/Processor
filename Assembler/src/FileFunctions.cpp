@@ -94,7 +94,7 @@ static ProcessorErrorCode WriteHeader (int binaryDescriptor, int listingDescript
         ProgramErrorCheck (OUTPUT_FILE_ERROR, "Error occuried while writing header to listing file");
     }
 
-    const size_t ListingHeaderBufferMaxSize = 256; // TODO more precise calculations
+    const size_t ListingHeaderBufferMaxSize = 256;
 
     Buffer <char> listingHeaderBuffer {};
     InitBuffer (&listingHeaderBuffer, sizeof (header) * ListingHeaderBufferMaxSize);

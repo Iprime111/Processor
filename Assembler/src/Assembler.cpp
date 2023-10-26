@@ -326,7 +326,7 @@ static ProcessorErrorCode CompileInstructionArgumentsData (AssemblerInstruction 
 
     switch (argumentsCount) {
         case 2:
-            if (permittedArguments != (REGISTER_ARGUMENT | IMMED_ARGUMENT)) {
+            if (permittedArguments != (REGISTER_ARGUMENT | IMMED_ARGUMENT) && permittedArguments != (REGISTER_ARGUMENT | IMMED_ARGUMENT | MEMORY_ARGUMENT)) {
                 SyntaxErrorCheck (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments", line, lineNumber);
             }
 
