@@ -3,7 +3,8 @@
 
 #include "CommonModules.h"
 #include "TextTypes.h"
+#include <SFML/System/Mutex.hpp>
 
-ProcessorErrorCode LaunchProgram (SPU *spu, char *sourceFilename, char *binaryFilename);
+ProcessorErrorCode LaunchProgram (SPU *spu, char *sourceFilename, char *binaryFilename, sf::Mutex *workMutex);
 
 #endif

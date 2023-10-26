@@ -9,13 +9,13 @@
 #include "Buffer.h"
 #include "Debugger.h"
 #include "FileIO.h"
+#include "GraphicsProvider.h"
 #include "MessageHandler.h"
 #include "SecureStack/SecureStack.h"
 #include "SoftProcessor.h"
 #include "ColorConsole.h"
 #include "CommonModules.h"
 #include "CustomAssert.h"
-#include "Logger.h"
 #include "Stack/StackPrintf.h"
 #include "TextTypes.h"
 #include "Stack/Stack.h"
@@ -32,53 +32,83 @@ static ProcessorErrorCode GenerateDisassembly (TextBuffer *disassemblyText, File
 
 static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *instruction, const CommandCode *commandCode, elem_t **argumentPointer);
 
-ProcessorErrorCode LaunchProgram (SPU *spu, char *sourceFilename, char *binaryFilename) {
+ProcessorErrorCode LaunchProgram (SPU *spu, char *sourceFilename, char *binaryFilename, sf::Mutex *workMutex) {
   	PushLog (1);
+
+	#define FreeDataAndReturnIfErrors(message, ...)									\
+			do {																	\
+				ProcessorErrorCode errorCode_ = __VA_ARGS__;						\
+				if (errorCode_ != NO_PROCESSOR_ERRORS) {							\
+					if (errorCode_ != PROCESSOR_HALT) {								\
+						PrintErrorMessage (errorCode_, message, NULL, NULL, -1);	\
+					}																\
+					workMutex->lock ();												\
+					spu->isWorking = false;											\
+					workMutex->unlock ();											\
+					StackDestruct_ (&spu->processorStack);							\
+					StackDestruct_ (&spu->callStack);								\
+					DestroyBuffer  (&debugInfoBuffer);								\
+					free (spu->ram);												\
+					if (IsDebugMode ()) {											\
+						DestroyFileBuffer (&sourceData);							\
+						DestroyBuffer (&breakpointsBuffer);							\
+						free (sourceText.lines);									\
+					}																\
+					RETURN errorCode_;												\
+				}																	\
+			} while (0)
+
+	workMutex->lock ();
+	spu->isWorking = true;
+	workMutex->unlock ();
+
+	Buffer <DebugInfoChunk> debugInfoBuffer  = {0, 0, NULL};
+	Buffer <DebugInfoChunk> breakpointsBuffer = {0, 0, NULL};
+	Header header = {};
+	TextBuffer sourceText = {};
+	FileBuffer sourceData = {};
 
 	StackInitDefault_ (&spu->processorStack);
 	StackInitDefault_ (&spu->callStack);
 
+	spu->ram = (elem_t *) calloc (VRAM_SIZE + RAM_SIZE, sizeof (elem_t));
+	if (!spu->ram) {
+		FreeDataAndReturnIfErrors ("Can not allocate ram arrray", NO_BUFFER);
+	}
+
 	PrintSuccessMessage ("Reading header...", NULL);
 
-	Header header = {};
-	ProgramErrorCheck (ReadHeader (spu, &header), "Error occuried while reading header");
+	FreeDataAndReturnIfErrors ("Error occuried while reading header", ReadHeader (spu, &header));
 
-	Buffer <DebugInfoChunk> debugInfoBuffer = {0, 0, NULL};
-	ProgramErrorCheck (ReadDebugInfo (spu, &debugInfoBuffer, &header), "Error occuried while reading debug info");
-
-	TextBuffer sourceText = {};
-	FileBuffer sourceData = {};
+	FreeDataAndReturnIfErrors ("Error occuried while reading debug info", ReadDebugInfo (spu, &debugInfoBuffer, &header));
 
 	if (sourceFilename && IsDebugMode ())
-		ProgramErrorCheck (ReadSourceFile (&sourceData, &sourceText, sourceFilename), "Error occuried while reading source file");
+		FreeDataAndReturnIfErrors ("Error occuried while reading source file", ReadSourceFile (&sourceData, &sourceText, sourceFilename));
 
-	if (IsDebugMode () && (!sourceFilename || !header.hasDebugInfo))
-		ProgramErrorCheck (GenerateDisassembly (&sourceText, &sourceData, &debugInfoBuffer, binaryFilename), "Error occuried while generating disassembly");
+	if (IsDebugMode () && (!sourceFilename || !header.hasDebugInfo)) {
+		FreeDataAndReturnIfErrors ("Error occuried while generating disassembly",
+										GenerateDisassembly (&sourceText, &sourceData, &debugInfoBuffer, binaryFilename));
+	}
 
-	Buffer <DebugInfoChunk> breakpointsBuffer = {0, 0, NULL};
 	if (IsDebugMode ()) {
-		ProgramErrorCheck(InitBuffer (&breakpointsBuffer, DEFAULT_BREAKPOINTS_BUFFER_CAPACITY), "Error occuried while initializing breakpoints buffer");
+		FreeDataAndReturnIfErrors ("Error occuried while initializing breakpoints buffer",
+									InitBuffer (&breakpointsBuffer, DEFAULT_BREAKPOINTS_BUFFER_CAPACITY));
+
 		InitDebugConsole ();
 
-		DebugConsole (spu, &debugInfoBuffer, &breakpointsBuffer);
+		if (DebugConsole (spu, &debugInfoBuffer, &breakpointsBuffer) == QUIT_PROGRAM) {
+			FreeDataAndReturnIfErrors ("", PROCESSOR_HALT);
+		}
 	}
 
 	PrintSuccessMessage ("Starting execution...", NULL);
 
 	while (ExecuteProgram (spu, &debugInfoBuffer, &breakpointsBuffer, &sourceText) != QUIT_PROGRAM) {};
 
-  	StackDestruct_ (&spu->processorStack);
-	StackDestruct_ (&spu->callStack);
-
-	DestroyBuffer  (&debugInfoBuffer);
-
-	if (IsDebugMode ()) {
-		DestroyBuffer     (&breakpointsBuffer);
-		DestroyFileBuffer (&sourceData);
-		free (sourceText.lines);
-	}
-
+  	FreeDataAndReturnIfErrors ("", PROCESSOR_HALT);
   	RETURN NO_PROCESSOR_ERRORS;
+
+	#undef FreeDataAndReturnIfErrors
 }
 
 static DebuggerAction ExecuteProgram (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, TextBuffer *sourceText) {
@@ -91,6 +121,10 @@ static DebuggerAction ExecuteProgram (SPU *spu, Buffer <DebugInfoChunk> *debugIn
 	spu->ip = 0;
 	spu->callStack.size      = 0;
 	spu->processorStack.size = 0;
+
+	for (size_t ramIndex = 0; ramIndex < RAM_SIZE + VRAM_SIZE; ramIndex++) {
+		spu->ram [ramIndex] = 0;
+	}
 
 	bool doStep = false;
 	ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
@@ -240,13 +274,13 @@ static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *br
 
 	GetArguments (spu, instruction, &commandCode, &argumentPointer);
 
-	#ifndef _NDEBUG
+	ON_DEBUG (
         char message [MAX_MESSAGE_LENGTH] = "";
         sprintf (message, "Reading command %s", instruction->instructionName);
         PrintInfoMessage (message, NULL);
-    #endif
+	)
 
-	RETURN instruction->callbackFunction (spu, &commandCode, argumentPointer);
+	RETURN  instruction->callbackFunction (spu, &commandCode, argumentPointer);
 }
 
 static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *instruction, const CommandCode *commandCode, elem_t **argumentPointer) {
@@ -283,7 +317,11 @@ static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *in
 	if (commandCode->arguments & MEMORY_ARGUMENT) {
 		usleep (spu->frequencySleep);
 
-		*argumentPointer = (spu->ram + (ssize_t) **argumentPointer);
+		if (spu->graphicsEnabled) {
+			ProgramErrorCheck(UpdateGraphics (spu, (size_t) **argumentPointer), "Error occuried while updating graphics");
+		}
+
+		*argumentPointer = (spu->ram + (size_t) **argumentPointer);
 	}
 
 	RETURN NO_PROCESSOR_ERRORS;

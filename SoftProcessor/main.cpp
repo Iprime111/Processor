@@ -13,7 +13,6 @@
 #include "CustomAssert.h"
 #include "FileIO.h"
 #include "ConsoleParser.h"
-#include "Logger.h"
 #include "MessageHandler.h"
 #include "SPU.h"
 #include "SoftProcessor.h"
@@ -24,11 +23,15 @@
 static char      *BinaryFile           = NULL;
 static char      *SourceFile           = NULL;
 static useconds_t FrequencyTime        = 0;
+static bool       IsGraphicsEnabled    = false;
+
+static sf::Mutex  WorkMutex            = {};
 
 void AddBinary       (char **arguments);
 void AddSource       (char **arguments);
 void SetFrequency    (char **arguments);
 void EnableDebugMode (char **arguments);
+void EnableGraphics  (char **arguments);
 
 static bool PrepareForExecuting (FileBuffer *fileBuffer);
 void LaunchThread (SPU *spu);
@@ -44,6 +47,7 @@ int main (int argc, char **argv){
     register_flag ("-s", "--source",    AddSource,       1);
     register_flag ("-f", "--frequency", SetFrequency,    1);
     register_flag ("-d", "--debug",     EnableDebugMode, 0);
+    register_flag ("-g", "--graphics",  EnableGraphics,  0);
     parse_flags   (argc, argv);
 
     //Read binary file
@@ -54,37 +58,50 @@ int main (int argc, char **argv){
     }
 
     SPU spu = {
-        .bytecode       = fileBuffer,
-        .frequencySleep = FrequencyTime,
+        .bytecode        = fileBuffer,
+        .frequencySleep  = FrequencyTime,
+        .graphicsEnabled = IsGraphicsEnabled,
+        .isWorking       = true,
     };
 
     sf::Thread processorThread (&LaunchThread, &spu);
     processorThread.launch ();
 
-    sf::RenderWindow window (sf::VideoMode (WINDOW_X_SIZE, WINDOW_Y_SIZE), "Processor Graphics", sf::Style::None);
-    window.setActive (false);
+    if (IsGraphicsEnabled) {
+        sf::RenderWindow window (sf::VideoMode (WINDOW_X_SIZE, WINDOW_Y_SIZE), "Processor Graphics", sf::Style::None);
+        window.setActive (false);
 
-    sf::Thread thread (&RenderingThread, &window);
-    thread.launch ();
+        sf::Thread graphicsThread (&RenderingThread, &window);
+        graphicsThread.launch ();
 
-    while (window.isOpen ()) {
-        sf::Event event = {};
+        while (window.isOpen ()) {
+            sf::Event event = {};
 
-        while (window.pollEvent (event))
-        {
-            if (event.type == sf::Event::Closed)
-                window.close();
+            WorkMutex.lock ();
+            if (!spu.isWorking) {
+                break;
+            }
+            WorkMutex.unlock ();
+
+            while (window.pollEvent (event))
+            {
+                if (event.type == sf::Event::Closed)
+                    window.close();
+            }
         }
 
+        window.close ();
+        graphicsThread.wait ();
     }
 
+    processorThread.wait ();
     DestroyFileBuffer (&fileBuffer);
 
     RETURN 0;
 }
 
 void LaunchThread (SPU *spu) {
-    LaunchProgram (spu, SourceFile, BinaryFile);
+    LaunchProgram (spu, SourceFile, BinaryFile, &WorkMutex);
 }
 
 static bool PrepareForExecuting (FileBuffer *fileBuffer) {
@@ -163,6 +180,14 @@ void EnableDebugMode (char **arguments) {
     PushLog (3);
 
     SetDebugMode (true);
+
+    RETURN;
+}
+
+void EnableGraphics  (char **arguments) {
+    PushLog (3);
+
+    IsGraphicsEnabled = true;
 
     RETURN;
 }

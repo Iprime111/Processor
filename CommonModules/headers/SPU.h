@@ -1,6 +1,8 @@
 #ifndef SPU_H_
 #define SPU_H_
 
+#include <SFML/System/Mutex.hpp>
+#include <cstddef>
 #include <sys/types.h>
 
 #include "TextTypes.h"
@@ -8,7 +10,7 @@
 #include "Stack/Stack.h"
 
 const size_t RAM_SIZE = 100;                    // ram and vram sizes
-const size_t VRAM_SIZE = 100;
+const size_t VRAM_SIZE = 1200;
 
 const unsigned int MIN_FREQUENCY = 1;           // minimal and maximal frequency (in MHz) for processor clocking
 const unsigned int MAX_FREQUENCY = 4200;
@@ -30,9 +32,12 @@ struct SPU {
 
     elem_t registerValues [REGISTER_COUNT] = {};
 
-    elem_t ram [RAM_SIZE + VRAM_SIZE] = {};
+    elem_t *ram = NULL;
 
     useconds_t frequencySleep = 0;
+
+    bool graphicsEnabled = false;
+    bool isWorking       = false;
 };
 
 #undef REGISTER

@@ -1,18 +1,18 @@
 .PHONY: all, test-assembler, test-disassembler, test-processor
 
-TestFile = ../tests/test2.asm
+TestFile = ../tests/test5.asm
 
 default: all
 
 test-assembler:
 	@echo now testing ${TestFile}
-	@./bin/Assembler -s ${TestFile} -l ../tests/listing -o ../tests/test
+	@./bin/Assembler -s ${TestFile} -l ../tests/listing -o ../tests/test --debug
 
 test-disassembler: test-assembler
 	@./bin/Disassembler -b ../tests/test -o ../tests/test.disasm
 
 test-processor: test-assembler
-	@./bin/SoftProcessor -b ../tests/test
+	@./bin/SoftProcessor -b ../tests/test --graphics --debug
 
 all: test-assembler test-disassembler test-processor
 
