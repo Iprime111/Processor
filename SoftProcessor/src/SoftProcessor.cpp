@@ -1,9 +1,12 @@
+#include <cstdio>
+#include <cstdlib>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <libgen.h>
 
 #include "AssemblyHeader.h"
 #include "Buffer.h"
@@ -154,7 +157,17 @@ static ProcessorErrorCode GenerateDisassembly (TextBuffer *disassemblyText, File
 	if (childProcess == -1) {
 		ProgramErrorCheck (FORK_ERROR, "Error occuried while forking disassembly process");
 	} else if (childProcess == 0) {
-		execl ("./bin/Disassembler", "Disassembler", "-b", binaryFilepath, "-o", DisassemblyPath, NULL);
+
+		char executablePath [FILENAME_MAX] = "";
+		ssize_t readBytes = readlink ("/proc/self/exe", executablePath, FILENAME_MAX);
+		if (readBytes >= 0) {
+			executablePath [readBytes] = '\0';
+		}
+
+		dirname (executablePath);
+		strcat (executablePath, "/Disassembler");
+
+		execl (executablePath, "Disassembler", "-b", binaryFilepath, "-o", DisassemblyPath, NULL);
         exit (0);
 	}
 
@@ -207,6 +220,8 @@ static ProcessorErrorCode ReadHeader (SPU *spu, Header *readHeader) {
 
 static ProcessorErrorCode ReadDebugInfo (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Header *header) {
 	PushLog (2);
+
+	// TODO read only if source is specified
 
 	custom_assert (spu, 			pointer_is_null, NO_PROCESSOR);
 	custom_assert (debugInfoBuffer, pointer_is_null, NO_BUFFER);
