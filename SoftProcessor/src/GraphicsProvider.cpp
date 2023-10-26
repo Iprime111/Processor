@@ -19,16 +19,30 @@ static sf::Mutex updateMutex = {};
 
 static ProcessorErrorCode InitCells ();
 
-void RenderingThread (sf::RenderWindow* window) {
+ProcessorErrorCode RenderLoop (sf::RenderWindow* window, SPU *spu, sf::Mutex *workMutex) {
+    PushLog (2);
+
     window->setActive (true);
 
-    ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;
-    if ((errorCode = InitCells ()) != NO_PROCESSOR_ERRORS) {
-        PrintErrorMessage (errorCode, "Error occuried while initializing ram graphics", NULL, NULL, -1);
-    }
+    ProgramErrorCheck (InitCells (), "Error occuried while initializing ram graphics");
+
 
     while (window->isOpen()) {
         window->clear ();
+
+        sf::Event event = {};
+
+        workMutex->lock ();
+        if (!spu->isWorking) {
+            window->close ();
+        }
+        workMutex->unlock ();
+
+        while (window->pollEvent (event))
+        {
+            if (event.type == sf::Event::Closed)
+                window->close();
+        }
 
         updateMutex.lock ();
         for (size_t cellIndex = 0; cellIndex < VRAM_SIZE / 3; cellIndex++) {
@@ -38,6 +52,8 @@ void RenderingThread (sf::RenderWindow* window) {
 
         window->display ();
     }
+
+    RETURN NO_PROCESSOR_ERRORS;
 }
 
 static ProcessorErrorCode InitCells () {

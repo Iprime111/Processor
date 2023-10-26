@@ -1,6 +1,7 @@
 #include <SFML/Graphics/RenderWindow.hpp>
 #include <SFML/System/Thread.hpp>
 #include <SFML/Window/Event.hpp>
+#include <SFML/Window/VideoMode.hpp>
 #include <SFML/Window/WindowStyle.hpp>
 #include <cstddef>
 #include <stdio.h>
@@ -68,30 +69,9 @@ int main (int argc, char **argv){
     processorThread.launch ();
 
     if (IsGraphicsEnabled) {
-        sf::RenderWindow window (sf::VideoMode (WINDOW_X_SIZE, WINDOW_Y_SIZE), "Processor Graphics", sf::Style::None);
-        window.setActive (false);
+        sf::RenderWindow window (sf::VideoMode (WINDOW_X_SIZE, WINDOW_Y_SIZE), "RAM graphics", sf::Style::None);
 
-        sf::Thread graphicsThread (&RenderingThread, &window);
-        graphicsThread.launch ();
-
-        while (window.isOpen ()) {
-            sf::Event event = {};
-
-            WorkMutex.lock ();
-            if (!spu.isWorking) {
-                break;
-            }
-            WorkMutex.unlock ();
-
-            while (window.pollEvent (event))
-            {
-                if (event.type == sf::Event::Closed)
-                    window.close();
-            }
-        }
-
-        window.close ();
-        graphicsThread.wait ();
+        RenderLoop (&window, &spu, &WorkMutex);
     }
 
     processorThread.wait ();
