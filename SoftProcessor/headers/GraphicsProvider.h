@@ -20,7 +20,6 @@ const float TOP_OFFSET              = (WINDOW_Y_SIZE - ((float) VRAM_SIZE / 3 / 
 const float OUTLINE_THICKNESS       = 1.5;
 
 ProcessorErrorCode UpdateGraphics (SPU *spu, size_t ramAddress);
-
-void RenderingThread (sf::RenderWindow* window);
+ProcessorErrorCode RenderLoop (sf::RenderWindow* window, SPU *spu, sf::Mutex *workMutex);
 
 #endif
