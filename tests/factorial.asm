@@ -1,4 +1,12 @@
 in
+
+pop rax
+push rax
+push 1
+jb Stop
+
+push rax
+
 call Factorial
 out
 hlt
@@ -9,7 +17,7 @@ Factorial:
 
     push rax
     push 1
-    jne NotOne
+    ja NotOne
 
     ret
 
@@ -19,5 +27,8 @@ Factorial:
         mul
 
     ret
+
+Stop:
+    hlt
 
 
