@@ -65,6 +65,10 @@ int main (int argc, char **argv){
         .isWorking       = true,
     };
 
+    if (IsGraphicsEnabled) {
+        ProgramErrorCheck (InitCells (), "Error occuried while initializing ram graphics");
+    }
+
     sf::Thread processorThread (&LaunchThread, &spu);
     processorThread.launch ();
 

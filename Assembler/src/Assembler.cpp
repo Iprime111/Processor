@@ -32,7 +32,7 @@ static ProcessorErrorCode CompileInstructionOpcode (TextLine *line, AssemblerIns
 static ProcessorErrorCode CompileInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments, ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer, int lineNumber);
 static ProcessorErrorCode ReadRamBrackets (AssemblerInstruction *instruction, TextLine *line, ssize_t *offset, ArgumentsType permittedArguments, int lineNumber);
 
-static ProcessorErrorCode SaveLabel (Buffer <char> *binaryBuffer, Buffer <Label> *labelsBuffer, TextLine *sourceLine, char *labelName, int labelNameLength);
+static ProcessorErrorCode SaveLabel (Buffer <char> *binaryBuffer, Buffer <Label> *labelsBuffer, TextLine *sourceLine, char *labelName);
 
 static ProcessorErrorCode EmitLabelListing       (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer,                                                                     TextLine *sourceLine, int lineNumber);
 static ProcessorErrorCode EmitInstructionListing (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, AssemblerInstruction *instruction, InstructionArguments *arguments, TextLine *sourceLine, int lineNumber);
@@ -131,10 +131,9 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
     }
 
     char labelName [LABEL_NAME_LENGTH] = "";
-    int labelNameLength = 0;
 
-    if (IsLabelLine (line, labelName, &labelNameLength)) {
-        ProgramErrorCheck (SaveLabel (binaryBuffer, labelsBuffer, line, labelName, labelNameLength),
+    if (IsLabelLine (line, labelName)) {
+        ProgramErrorCheck (SaveLabel (binaryBuffer, labelsBuffer, line, labelName),
                             "Error occuried while saving label");
         ProgramErrorCheck (EmitLabelListing (binaryBuffer, listingBuffer, line, lineNumber),
                             "Error occuried while writing label to the listing");
@@ -162,13 +161,13 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
         RETURN errorCode;
     }
 
-    ProgramErrorCheck (EmitInstructionBinary  (binaryBuffer,                &outputInstruction, &arguments, line, lineNumber), "Error occuried while emitting instruction to a binary");
-    ProgramErrorCheck (EmitInstructionListing (binaryBuffer, listingBuffer, &outputInstruction, &arguments, line, lineNumber), "Error occuried while emitting instruction to a listing");
-
     if (debugInfoBuffer && IsDebugMode ()) {
         DebugInfoChunk commandDebugInfo = {binaryBuffer->currentIndex, lineNumber};
         ProgramErrorCheck (WriteDataToBuffer (debugInfoBuffer, &commandDebugInfo, 1), "Error occuried while writing debug information to a buffer");
     }
+
+    ProgramErrorCheck (EmitInstructionBinary  (binaryBuffer,                &outputInstruction, &arguments, line, lineNumber), "Error occuried while emitting instruction to a binary");
+    ProgramErrorCheck (EmitInstructionListing (binaryBuffer, listingBuffer, &outputInstruction, &arguments, line, lineNumber), "Error occuried while emitting instruction to a listing");
 
     RETURN NO_PROCESSOR_ERRORS;
 }
@@ -380,11 +379,18 @@ static ProcessorErrorCode CompileInstructionArgumentsData (AssemblerInstruction 
 }
 
 
-static ProcessorErrorCode SaveLabel (Buffer <char> *binaryBuffer, Buffer <Label> *labelsBuffer, TextLine *sourceLine, char *labelName, int labelNameLength) {
+static ProcessorErrorCode SaveLabel (Buffer <char> *binaryBuffer, Buffer <Label> *labelsBuffer, TextLine *sourceLine, char *labelName) {
     PushLog (3);
 
-    Label label {};
+    custom_assert (binaryBuffer, pointer_is_null, NO_BUFFER);
+    custom_assert (labelsBuffer, pointer_is_null, NO_BUFFER);
+    custom_assert (sourceLine,   pointer_is_null, NO_BUFFER);
+
+    size_t labelNameLength = strlen (labelName);
+
     labelName [labelNameLength - 1] = '\0';
+
+    Label label {};
     InitLabel (&label, labelName, (long long) binaryBuffer->currentIndex);
 
     WriteDataToBufferErrorCheck ("Error occuried while writing label to buffer", labelsBuffer, &label, 1);

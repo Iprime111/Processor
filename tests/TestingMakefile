@@ -1,6 +1,6 @@
 .PHONY: all, test-assembler, test-disassembler, test-processor
 
-TestFile = ../tests/test5.asm
+TestFile = ../tests/test4.asm
 
 default: all
 
@@ -12,7 +12,7 @@ test-disassembler: test-assembler
 	@./bin/Disassembler -b ../tests/test -o ../tests/test.disasm
 
 test-processor: test-assembler
-	@./bin/SoftProcessor -b ../tests/test --graphics --debug
+	@./bin/SoftProcessor -b ../tests/test -s ${TestFile} --graphics --debug
 
 all: test-assembler test-disassembler test-processor
 

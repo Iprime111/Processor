@@ -29,7 +29,7 @@ static DebuggerAction ExecuteProgram (SPU *spu, Buffer <DebugInfoChunk> *debugIn
 
 static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *breakpointsBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, TextBuffer *sourceText, bool *doStep);
 static ProcessorErrorCode ReadHeader      (SPU *spu, Header *readHeader);
-static ProcessorErrorCode ReadDebugInfo   (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Header *header);
+static ProcessorErrorCode ReadDebugInfo   (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Header *header, char *sourcePath);
 
 static ProcessorErrorCode GenerateDisassembly (TextBuffer *disassemblyText, FileBuffer *disassemblyBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, char *binaryFilepath);
 
@@ -83,7 +83,7 @@ ProcessorErrorCode LaunchProgram (SPU *spu, char *sourceFilename, char *binaryFi
 
 	FreeDataAndReturnIfErrors ("Error occuried while reading header", ReadHeader (spu, &header));
 
-	FreeDataAndReturnIfErrors ("Error occuried while reading debug info", ReadDebugInfo (spu, &debugInfoBuffer, &header));
+	FreeDataAndReturnIfErrors ("Error occuried while reading debug info", ReadDebugInfo (spu, &debugInfoBuffer, &header, sourceFilename));
 
 	if (sourceFilename && IsDebugMode ())
 		FreeDataAndReturnIfErrors ("Error occuried while reading source file", ReadSourceFile (&sourceData, &sourceText, sourceFilename));
@@ -218,7 +218,7 @@ static ProcessorErrorCode ReadHeader (SPU *spu, Header *readHeader) {
 	RETURN CheckHeader (readHeader);
 }
 
-static ProcessorErrorCode ReadDebugInfo (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Header *header) {
+static ProcessorErrorCode ReadDebugInfo (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Header *header, char *sourcePath) {
 	PushLog (2);
 
 	// TODO read only if source is specified
@@ -233,7 +233,10 @@ static ProcessorErrorCode ReadDebugInfo (SPU *spu, Buffer <DebugInfoChunk> *debu
 
 	ProgramErrorCheck (InitBuffer (debugInfoBuffer, header->commandsCount), "Error occuried while initializing debug info buffer");
 	ReadArrayData (spu, debugInfoBuffer->data, header->commandsCount, DebugInfoChunk);
-	debugInfoBuffer->currentIndex = debugInfoBuffer->capacity;
+
+	if (sourcePath) {
+		debugInfoBuffer->currentIndex = debugInfoBuffer->capacity;
+	}
 
 	ShrinkBytecodeBuffer (spu, spu->ip);
 
@@ -295,7 +298,13 @@ static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *br
         PrintInfoMessage (message, NULL);
 	)
 
-	RETURN  instruction->callbackFunction (spu, &commandCode, argumentPointer);
+	ProcessorErrorCode operationErrorCode = instruction->callbackFunction (spu, &commandCode, argumentPointer);
+
+	if ((commandCode.arguments & MEMORY_ARGUMENT) && spu->graphicsEnabled) {
+		ProgramErrorCheck(UpdateGraphics (spu, (size_t) (argumentPointer - spu->ram)), "Error occuried while updating graphics");
+	}
+
+	RETURN operationErrorCode;
 }
 
 static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *instruction, const CommandCode *commandCode, elem_t **argumentPointer) {
@@ -331,10 +340,6 @@ static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *in
 
 	if (commandCode->arguments & MEMORY_ARGUMENT) {
 		usleep (spu->frequencySleep);
-
-		if (spu->graphicsEnabled) {
-			ProgramErrorCheck(UpdateGraphics (spu, (size_t) **argumentPointer), "Error occuried while updating graphics");
-		}
 
 		*argumentPointer = (spu->ram + (size_t) **argumentPointer);
 	}

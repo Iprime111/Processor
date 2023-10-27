@@ -8,7 +8,7 @@ ssize_t CountWhitespaces      (TextLine *line);
 ssize_t FindActualStringEnd   (TextLine *line);
 ssize_t FindActualStringBegin (TextLine *line);
 
-bool IsLabelLine (TextLine *line, char *labelName, int *labelNameLength);
+bool IsLabelLine (TextLine *line, char *labelName);
 
 ProcessorErrorCode DeleteExcessWhitespaces (TextBuffer *lines);
 
