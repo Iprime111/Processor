@@ -76,7 +76,7 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
                 __VA_ARGS__;                                                          \
             }                                                                         \
 
-        DEBUGGER_COMMAND_ ("quit",       "q", DestroyBufferAndReturn (QUIT_PROGRAM))
+        DEBUGGER_COMMAND_ ("quit",       "q", DestroyBufferAndReturn (QUIT_PROGRAM)) // TODO ;
         DEBUGGER_COMMAND_ ("continue",   "c", DestroyBufferAndReturn (CONTINUE_PROGRAM));
         DEBUGGER_COMMAND_ ("run",        "r", DestroyBufferAndReturn (RUN_PROGRAM));
         DEBUGGER_COMMAND_ ("step",       "s", DestroyBufferAndReturn (STEP_PROGRAM));
@@ -98,7 +98,14 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
 
 ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, const char *filename) {
     PushLog (3);
-
+    
+    // TODO
+    // #define check_err(func, msg)
+        // if (!func)
+            // ProgramErrorCheck (NO_BUFFER, msg);
+    // 
+    // check_err(CreateFileBuffer (fileBuffer, filename), "Error occuried while creating source file buffer")
+             
 	if (!CreateFileBuffer (fileBuffer, filename)) {
         ProgramErrorCheck (NO_BUFFER, "Error occuried while creating source file buffer");
     }
@@ -139,13 +146,14 @@ static void DumpMemory (SPU *spu, char *arguments) {
     fputs ("\n\n" MOVE_CURSOR_UP (1), stderr);
 
     #define MOVE_FORWARD_PRINT "\r\033[%ldC"
+    // MOVE_CURSOR_FORWARD(%ld) //TODO
 
     for (ssize_t ramIndex = dumpAddress; ramIndex < dumpAddress + dumpSize; ramIndex++) {
         const ssize_t NumberFieldSize = 8;
         ssize_t offset = (ramIndex - dumpAddress) * NumberFieldSize ;
 
         fprintf_color (CONSOLE_WHITE, CONSOLE_BOLD, stderr, MOVE_FORWARD_PRINT "%-7ld" MOVE_CURSOR_DOWN (1) MOVE_FORWARD_PRINT "%-5g" MOVE_CURSOR_UP (1),
-                            offset, ramIndex, offset, spu->ram [ramIndex]);
+                            offset, ramIndex, offset, spu->ram [ramIndex]); 
     }
 
     #undef MOVE_FORWARD_PRINT

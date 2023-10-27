@@ -4,7 +4,7 @@ add_executable (${PROJECT_NAME} main.cpp)
 
 add_subdirectory (src)
 
-find_package (SFML 2.6 COMPONENTS graphics window system REQUIRED)
+find_package (SFML 2.5 COMPONENTS graphics window system REQUIRED)
 
 target_link_libraries (${PROJECT_NAME} PRIVATE sfml-graphics)
 target_link_libraries (${PROJECT_NAME} PRIVATE ColorConsole)

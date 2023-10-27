@@ -61,6 +61,9 @@ ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryD
 
     size_t commandsCount = 0;
 
+    // for (auto &&instruction : function)        
+    //     if (auto *push_i = dyn_cast<Type::push>(instruction))
+    //         std::cout << push->isArgIsMemory();
 
     #define TerminateIfErrorsWereFound(message, ...)                                                                                    \
         do {                                                                                                                            \
