@@ -52,11 +52,9 @@ ProcessorErrorCode LaunchProgram (SPU *spu, char *sourceFilename, char *binaryFi
 					StackDestruct_ (&spu->callStack);								\
 					DestroyBuffer  (&debugInfoBuffer);								\
 					free (spu->ram);												\
-					if (IsDebugMode ()) {											\
-						DestroyFileBuffer (&sourceData);							\
-						DestroyBuffer (&breakpointsBuffer);							\
-						free (sourceText.lines);									\
-					}																\
+					DestroyFileBuffer (&sourceData);								\
+					DestroyBuffer (&breakpointsBuffer);								\
+					free (sourceText.lines);										\
 					RETURN errorCode_;												\
 				}																	\
 			} while (0)
@@ -89,6 +87,10 @@ ProcessorErrorCode LaunchProgram (SPU *spu, char *sourceFilename, char *binaryFi
 		FreeDataAndReturnIfErrors ("Error occuried while reading source file", ReadSourceFile (&sourceData, &sourceText, sourceFilename));
 
 	if (IsDebugMode () && (!sourceFilename || !header.hasDebugInfo)) {
+		if (sourceFilename) {
+			free (sourceText.lines);
+			DestroyFileBuffer (&sourceData);
+		}
 		FreeDataAndReturnIfErrors ("Error occuried while generating disassembly",
 										GenerateDisassembly (&sourceText, &sourceData, &debugInfoBuffer, binaryFilename));
 	}
@@ -194,7 +196,7 @@ static ProcessorErrorCode GenerateDisassembly (TextBuffer *disassemblyText, File
 		}
 
 		disassemblyText->lines [lineIndex].pointer += addressLength;
-		debugInfo.line = (int) lineIndex;
+		debugInfo.line = (int) lineIndex + 1;
 
 		WriteDataToBufferErrorCheck ("Error occuried while writing debug info to a buffer", debugInfoBuffer, &debugInfo, 1);
 	}
@@ -220,8 +222,6 @@ static ProcessorErrorCode ReadHeader (SPU *spu, Header *readHeader) {
 
 static ProcessorErrorCode ReadDebugInfo (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Header *header, char *sourcePath) {
 	PushLog (2);
-
-	// TODO read only if source is specified
 
 	custom_assert (spu, 			pointer_is_null, NO_PROCESSOR);
 	custom_assert (debugInfoBuffer, pointer_is_null, NO_BUFFER);
@@ -339,7 +339,9 @@ static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *in
 	}
 
 	if (commandCode->arguments & MEMORY_ARGUMENT) {
-		usleep (spu->frequencySleep);
+		if (spu->frequencySleep > 0) {
+			usleep (spu->frequencySleep);
+		}
 
 		*argumentPointer = (spu->ram + (size_t) **argumentPointer);
 	}

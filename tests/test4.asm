@@ -4,6 +4,7 @@ Begin:
 
     jb Continue
 
+    in
     hlt
 
 Continue:

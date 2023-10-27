@@ -4,7 +4,7 @@ set (COMPILE_FLAGS -ggdb3 -std=c++17 -O0 -Wall -Wextra -Weffc++ -Waggressive-loo
 
 add_link_options (${COMPILE_FLAGS})
 add_compile_options (${COMPILE_FLAGS})
-add_compile_definitions (_SHOW_STACK_TRACE _NDEBUG)
+add_compile_definitions (_SHOW_STACK_TRACE)
 
 option (BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
