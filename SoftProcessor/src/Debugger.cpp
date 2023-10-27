@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdio>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -25,10 +26,10 @@ static ProcessorErrorCode PlaceBreakpoint  (SPU *spu, char *arguments, Buffer <D
 static ProcessorErrorCode PrintSpuData     (SPU *spu, char *arguments);
 
 static void PrintMemoryValue      (SPU *spu, ssize_t address, char *arguments);
+static void DumpMemory            (SPU *spu, char *arguments);
 static void PrintRegister         (SPU *spu, unsigned char registerIndex, char *registerName);
 static void PrintRegisterAndImmed (SPU *spu, unsigned char registerIndex, elem_t value);
 static void PrintImmed            (elem_t value);
-static void DumpMemory            ();
 
 static bool HasRamBrackets (TextLine *arguments);
 static void ShowDebuggerLogo (FILE *stream);
@@ -47,7 +48,7 @@ ProcessorErrorCode InitDebugConsole () {
 DebuggerAction BreakpointStop (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, const DebugInfoChunk *breakpointData, TextBuffer *text) {
     PushLog (2);
 
-    fprintf (stderr, "Break: " BOLD_WHITE_COLOR "%s\n", text->lines [breakpointData->line - 1].pointer);
+    fprintf (stderr, "Break: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Ip:     " BOLD_WHITE_COLOR "%lu\n", text->lines [breakpointData->line - 1].pointer, breakpointData->address);
 
     RETURN DebugConsole (spu, debugInfoBuffer, breakpointsBuffer);
 }
@@ -81,8 +82,8 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
         DEBUGGER_COMMAND_ ("step",       "s", DestroyBufferAndReturn (STEP_PROGRAM));
         DEBUGGER_COMMAND_ ("print",      "p", {PrintSpuData    (spu, argumentsLine);                                     free (input); continue;});
         DEBUGGER_COMMAND_ ("breakpoint", "b", {PlaceBreakpoint (spu, argumentsLine, debugInfoBuffer, breakpointsBuffer); free (input); continue;});
-        DEBUGGER_COMMAND_ ("memory",     "m", {DumpMemory();                                                             free (input); continue;});
-        DEBUGGER_COMMAND_ ("telescope",  "t", {DumpStackData (&spu->processorStack);                                     free (input); continue;});
+        DEBUGGER_COMMAND_ ("memory",     "m", {DumpMemory      (spu, argumentsLine);                                     free (input); continue;});
+        DEBUGGER_COMMAND_ ("telescope",  "t", {DumpStackData   (&spu->processorStack);                                   free (input); continue;});
 
         PrintErrorMessage (NO_PROCESSOR_ERRORS, "Please enter valid command", DEBUGGER_ERROR_PREFIX, NULL, -1);
 
@@ -113,8 +114,45 @@ ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, con
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static void DumpMemory () {
+static void DumpMemory (SPU *spu, char *arguments) {
+    PushLog (3);
 
+    custom_assert (arguments, pointer_is_null, (void)0);
+
+    ssize_t dumpAddress = 0;
+    ssize_t dumpSize    = 0;
+
+    if (sscanf(arguments, "%ld %ld", &dumpAddress, &dumpSize) < 2) {
+        RETURN;
+    }
+
+    if (dumpAddress < 0 || dumpAddress >= (ssize_t) (RAM_SIZE + VRAM_SIZE)) {
+        PrintErrorMessage (NO_PROCESSOR_ERRORS, "Incorrect dump address", DEBUGGER_ERROR_PREFIX, NULL, -1);
+        RETURN;
+    }
+
+    if (dumpSize < 0 || dumpAddress + dumpSize > (ssize_t) (RAM_SIZE + VRAM_SIZE)) {
+        PrintErrorMessage (NO_PROCESSOR_ERRORS, "Incorrect dump size", DEBUGGER_ERROR_PREFIX, NULL, -1);
+        RETURN;
+    }
+
+    fputs ("\n\n" MOVE_CURSOR_UP (1), stderr);
+
+    #define MOVE_FORWARD_PRINT "\r\033[%ldC"
+
+    for (ssize_t ramIndex = dumpAddress; ramIndex < dumpAddress + dumpSize; ramIndex++) {
+        const ssize_t NumberFieldSize = 8;
+        ssize_t offset = (ramIndex - dumpAddress) * NumberFieldSize ;
+
+        fprintf_color (CONSOLE_WHITE, CONSOLE_BOLD, stderr, MOVE_FORWARD_PRINT "%-7ld" MOVE_CURSOR_DOWN (1) MOVE_FORWARD_PRINT "%-5g" MOVE_CURSOR_UP (1),
+                            offset, ramIndex, offset, spu->ram [ramIndex]);
+    }
+
+    #undef MOVE_FORWARD_PRINT
+
+    fputs ("\n\n\r", stderr);
+
+    RETURN;
 }
 
 static ProcessorErrorCode PrintSpuData (SPU *spu, char *arguments) {
