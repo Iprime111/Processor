@@ -7,7 +7,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <libgen.h>
-#include <SFML/System.hpp>
 
 #include "AssemblyHeader.h"
 #include "Buffer.h"
@@ -341,7 +340,7 @@ static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *in
 
 	if (commandCode->arguments & MEMORY_ARGUMENT) {
 		if (spu->frequencySleep > 0) {
-			sf::sleep(sf::microseconds(spu->frequencySleep));
+			usleep (spu->frequencySleep);
 		}
 
 		*argumentPointer = (spu->ram + (size_t) **argumentPointer);
