@@ -61,7 +61,6 @@ ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryD
 
     size_t commandsCount = 0;
 
-
     #define TerminateIfErrorsWereFound(message, ...)                                                                                    \
         do {                                                                                                                            \
             ProcessorErrorCode errorCode = NO_PROCESSOR_ERRORS;                                                                         \

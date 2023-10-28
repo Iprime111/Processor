@@ -30,6 +30,7 @@ static void DumpMemory   (SPU *spu, char *arguments);
 static ProcessorErrorCode GetDumpArguments (char *arguments, ssize_t *dumpAddress, ssize_t *dumpSize, ssize_t maxSize);
 
 static void PrintMemoryValue      (SPU *spu, ssize_t address, char *arguments);
+static void DumpMemory            (SPU *spu, char *arguments);
 static void PrintRegister         (SPU *spu, unsigned char registerIndex, char *registerName);
 static void PrintRegisterAndImmed (SPU *spu, unsigned char registerIndex, elem_t value);
 static void PrintImmed            (elem_t value);
@@ -38,23 +39,6 @@ static bool HasRamBrackets (TextLine *arguments);
 static void ShowDebuggerLogo (FILE *stream);
 
 static char DEBUGGER_ERROR_PREFIX [] = "Debugger";
-
-ProcessorErrorCode InitDebugConsole () {
-    PushLog (3);
-
-    //fprintf (stderr, CLEAR_SCREEN());
-    ShowDebuggerLogo (stderr);
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-DebuggerAction BreakpointStop (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, const DebugInfoChunk *breakpointData, TextBuffer *text) {
-    PushLog (2);
-
-    fprintf (stderr, "Break: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Ip:     " BOLD_WHITE_COLOR "%lu\n", text->lines [breakpointData->line - 1].pointer, breakpointData->address);
-
-    RETURN DebugConsole (spu, debugInfoBuffer, breakpointsBuffer);
-}
 
 DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer) {
     PushLog (2);
@@ -77,9 +61,9 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
         #define DEBUGGER_COMMAND_(name, shortName, ...)                               \
             if (!strcmp (commandName, name) || !strcmp (commandName, shortName)) {    \
                 __VA_ARGS__;                                                          \
-            }                                                                         \
+            }
 
-        DEBUGGER_COMMAND_ ("quit",       "q",  DestroyBufferAndReturn (QUIT_PROGRAM))
+        DEBUGGER_COMMAND_ ("quit",       "q",  DestroyBufferAndReturn (QUIT_PROGRAM));
         DEBUGGER_COMMAND_ ("continue",   "c",  DestroyBufferAndReturn (CONTINUE_PROGRAM));
         DEBUGGER_COMMAND_ ("run",        "r",  DestroyBufferAndReturn (RUN_PROGRAM));
         DEBUGGER_COMMAND_ ("step",       "s",  DestroyBufferAndReturn (STEP_PROGRAM));
@@ -88,6 +72,7 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
         DEBUGGER_COMMAND_ ("memory",     "m",  {DumpMemory      (spu, argumentsLine);                                     free (input); continue;});
         DEBUGGER_COMMAND_ ("bytecode",   "by", {DumpBytecode    (spu, argumentsLine);                                     free (input); continue;});
         DEBUGGER_COMMAND_ ("telescope",  "t",  {DumpStackData   (&spu->processorStack);                                   free (input); continue;});
+
 
         PrintErrorMessage (NO_PROCESSOR_ERRORS, "Please enter valid command", DEBUGGER_ERROR_PREFIX, NULL, -1);
 
@@ -100,31 +85,40 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
 
 }
 
+DebuggerAction BreakpointStop (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, const DebugInfoChunk *breakpointData, TextBuffer *text) {
+    PushLog (2);
+
+    fprintf (stderr, "Break: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Ip:     " BOLD_WHITE_COLOR "%lu\n", text->lines [breakpointData->line - 1].pointer, breakpointData->address);
+
+    RETURN DebugConsole (spu, debugInfoBuffer, breakpointsBuffer);
+}
+
 ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, const char *filename) {
     PushLog (3);
 
-	if (!CreateFileBuffer (fileBuffer, filename)) {
-        ProgramErrorCheck (NO_BUFFER, "Error occuried while creating source file buffer");
-    }
+    #define CheckError(function, msg)               \
+        if (!function)                              \
+            ProgramErrorCheck (NO_BUFFER, msg);
 
-    if (!ReadFileLines (filename, fileBuffer, text)) {
-        ProgramErrorCheck (NO_BUFFER, "Error occuried while reading file lines");
-    }
 
-    if (!ChangeNewLinesToZeroes (text)) {
-        ProgramErrorCheck (NO_BUFFER, "Error occuried while changing new line symbols to zero symbols");
-    }
+    CheckError (CreateFileBuffer       (fileBuffer, filename),       "Error occuried while creating source file buffer")
+    CheckError (ReadFileLines          (filename, fileBuffer, text), "Error occuried while reading file lines");
+    CheckError (ChangeNewLinesToZeroes (text),                       "Error occuried while changing new line symbols to zero symbols");
+
+    #undef CheckError
 
     RETURN NO_PROCESSOR_ERRORS;
 }
 
 static void DumpBytecode (SPU *spu, char *arguments) {
+
     PushLog (3);
 
     custom_assert (arguments, pointer_is_null, (void)0);
 
     ssize_t dumpAddress = 0;
     ssize_t dumpSize    = 0;
+
 
     if (GetDumpArguments (arguments, &dumpAddress, &dumpSize, spu->bytecode.buffer_size) != NO_PROCESSOR_ERRORS) {
         RETURN;
@@ -321,6 +315,14 @@ static ProcessorErrorCode PlaceBreakpoint (SPU *spu, char *arguments, Buffer <De
     }
 
     WriteDataToBuffer (breakpointsBuffer, foundAddress, 1);
+
+    RETURN NO_PROCESSOR_ERRORS;
+}
+
+ProcessorErrorCode InitDebugConsole () {
+    PushLog (3);
+
+    ShowDebuggerLogo (stderr);
 
     RETURN NO_PROCESSOR_ERRORS;
 }
