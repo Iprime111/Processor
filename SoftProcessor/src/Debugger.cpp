@@ -40,23 +40,6 @@ static void ShowDebuggerLogo (FILE *stream);
 
 static char DEBUGGER_ERROR_PREFIX [] = "Debugger";
 
-ProcessorErrorCode InitDebugConsole () {
-    PushLog (3);
-
-    //fprintf (stderr, CLEAR_SCREEN());
-    ShowDebuggerLogo (stderr);
-
-    RETURN NO_PROCESSOR_ERRORS;
-}
-
-DebuggerAction BreakpointStop (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, const DebugInfoChunk *breakpointData, TextBuffer *text) {
-    PushLog (2);
-
-    fprintf (stderr, "Break: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Ip:     " BOLD_WHITE_COLOR "%lu\n", text->lines [breakpointData->line - 1].pointer, breakpointData->address);
-
-    RETURN DebugConsole (spu, debugInfoBuffer, breakpointsBuffer);
-}
-
 DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer) {
     PushLog (2);
 
@@ -102,6 +85,14 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
 
 }
 
+DebuggerAction BreakpointStop (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, const DebugInfoChunk *breakpointData, TextBuffer *text) {
+    PushLog (2);
+
+    fprintf (stderr, "Break: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Ip:     " BOLD_WHITE_COLOR "%lu\n", text->lines [breakpointData->line - 1].pointer, breakpointData->address);
+
+    RETURN DebugConsole (spu, debugInfoBuffer, breakpointsBuffer);
+}
+
 ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, const char *filename) {
     PushLog (3);
 
@@ -113,7 +104,7 @@ ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, con
     CheckError (CreateFileBuffer       (fileBuffer, filename),       "Error occuried while creating source file buffer")
     CheckError (ReadFileLines          (filename, fileBuffer, text), "Error occuried while reading file lines");
     CheckError (ChangeNewLinesToZeroes (text),                       "Error occuried while changing new line symbols to zero symbols");
-    
+
     #undef CheckError
 
     RETURN NO_PROCESSOR_ERRORS;
@@ -324,6 +315,14 @@ static ProcessorErrorCode PlaceBreakpoint (SPU *spu, char *arguments, Buffer <De
     }
 
     WriteDataToBuffer (breakpointsBuffer, foundAddress, 1);
+
+    RETURN NO_PROCESSOR_ERRORS;
+}
+
+ProcessorErrorCode InitDebugConsole () {
+    PushLog (3);
+
+    ShowDebuggerLogo (stderr);
 
     RETURN NO_PROCESSOR_ERRORS;
 }
