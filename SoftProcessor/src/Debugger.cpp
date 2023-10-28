@@ -20,17 +20,22 @@
 #include "Registers.h"
 #include "SPU.h"
 #include "StringProcessing.h"
+#include "SoftProcessor.h"
 #include "TextTypes.h"
+
+static ProcessorErrorCode ExecuteCommand (SPU *spu, char *arguments);
 
 static ProcessorErrorCode PlaceBreakpoint  (SPU *spu, char *arguments, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer);
 static ProcessorErrorCode PrintSpuData     (SPU *spu, char *arguments);
 
+static ProcessorErrorCode GetDumpArguments      (char *arguments, ssize_t *dumpAddress, ssize_t *dumpSize, ssize_t maxSize);
+static ArgumentsType      ParseCommandArguments (SPU *spu, char *arguments, unsigned char *registerArgument, elem_t *immedArgument, char *registerName);
+static ProcessorErrorCode GetArgumentsPointer   (SPU *spu, const CommandCode *commandCode, elem_t **argumentPointer, elem_t *immedArgument, unsigned char *registerArgument);
+
 static void DumpBytecode (SPU *spu, char *arguments);
 static void DumpMemory   (SPU *spu, char *arguments);
-static ProcessorErrorCode GetDumpArguments (char *arguments, ssize_t *dumpAddress, ssize_t *dumpSize, ssize_t maxSize);
 
 static void PrintMemoryValue      (SPU *spu, ssize_t address, char *arguments);
-static void DumpMemory            (SPU *spu, char *arguments);
 static void PrintRegister         (SPU *spu, unsigned char registerIndex, char *registerName);
 static void PrintRegisterAndImmed (SPU *spu, unsigned char registerIndex, elem_t value);
 static void PrintImmed            (elem_t value);
@@ -71,8 +76,8 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
         DEBUGGER_COMMAND_ ("breakpoint", "b",  {PlaceBreakpoint (spu, argumentsLine, debugInfoBuffer, breakpointsBuffer); free (input); continue;});
         DEBUGGER_COMMAND_ ("memory",     "m",  {DumpMemory      (spu, argumentsLine);                                     free (input); continue;});
         DEBUGGER_COMMAND_ ("bytecode",   "by", {DumpBytecode    (spu, argumentsLine);                                     free (input); continue;});
+        DEBUGGER_COMMAND_ ("execute",    "e",  {ExecuteCommand  (spu, argumentsLine);                                     free (input); continue;});
         DEBUGGER_COMMAND_ ("telescope",  "t",  {DumpStackData   (&spu->processorStack);                                   free (input); continue;});
-
 
         PrintErrorMessage (NO_PROCESSOR_ERRORS, "Please enter valid command", DEBUGGER_ERROR_PREFIX, NULL, -1);
 
@@ -88,26 +93,9 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
 DebuggerAction BreakpointStop (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, const DebugInfoChunk *breakpointData, TextBuffer *text) {
     PushLog (2);
 
-    fprintf (stderr, "Break: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Ip:     " BOLD_WHITE_COLOR "%lu\n", text->lines [breakpointData->line - 1].pointer, breakpointData->address);
+    fprintf (stderr, "\nBreak: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Ip:     " BOLD_WHITE_COLOR "%lu\n", text->lines [breakpointData->line - 1].pointer, breakpointData->address);
 
     RETURN DebugConsole (spu, debugInfoBuffer, breakpointsBuffer);
-}
-
-ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, const char *filename) {
-    PushLog (3);
-
-    #define CheckError(function, msg)               \
-        if (!function)                              \
-            ProgramErrorCheck (NO_BUFFER, msg);
-
-
-    CheckError (CreateFileBuffer       (fileBuffer, filename),       "Error occuried while creating source file buffer")
-    CheckError (ReadFileLines          (filename, fileBuffer, text), "Error occuried while reading file lines");
-    CheckError (ChangeNewLinesToZeroes (text),                       "Error occuried while changing new line symbols to zero symbols");
-
-    #undef CheckError
-
-    RETURN NO_PROCESSOR_ERRORS;
 }
 
 static void DumpBytecode (SPU *spu, char *arguments) {
@@ -133,7 +121,7 @@ static void DumpBytecode (SPU *spu, char *arguments) {
         const ssize_t NumberFieldSize = 8;
         ssize_t offset = (byteIndex - dumpAddress) * NumberFieldSize + TitleFieldSize;
 
-        if (spu->ip == byteIndex) {
+        if ((ssize_t) spu->ip == byteIndex) {
             fprintf_color (CONSOLE_BLUE, CONSOLE_BOLD, stderr, "\r" MOVE_CURSOR_DOWN (2) MOVE_CURSOR_FORWARD (%ld) "^" MOVE_CURSOR_UP (2), offset);
         }
 
@@ -197,10 +185,9 @@ static ProcessorErrorCode GetDumpArguments (char *arguments, ssize_t *dumpAddres
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode PrintSpuData (SPU *spu, char *arguments) {
+static ArgumentsType ParseCommandArguments (SPU *spu, char *arguments, unsigned char *registerArgument, elem_t *immedArgument, char *registerName) {
     PushLog (3);
 
-    arguments = strtok (arguments, " ");
     TextLine argumentsLine = {arguments, strlen (arguments)};
 
     bool isRamValue = HasRamBrackets (&argumentsLine);
@@ -213,43 +200,128 @@ static ProcessorErrorCode PrintSpuData (SPU *spu, char *arguments) {
     #define FIND_REGISTER()                                                                                     \
             const Register *foundRegister = FindRegisterByName (registerName);                                  \
             if (foundRegister) {                                                                                \
-                registerIndex = foundRegister->index;                                                           \
+                *registerArgument = foundRegister->index;                                                       \
             } else {                                                                                            \
                 PrintErrorMessage (NO_PROCESSOR_ERRORS, "Wrong register name", DEBUGGER_ERROR_PREFIX, NULL, -1);\
-                RETURN TOO_FEW_ARGUMENTS;                                                                       \
+                RETURN NO_ARGUMENTS;                                                                            \
             }
 
-    elem_t value = 0;
-    unsigned char registerIndex = 0;
-    char registerName [MAX_REGISTER_NAME_LENGTH + 1] = "";
-
-    if (sscanf (argumentsLine.pointer, "%3s+%lf", registerName, &value) == 2) {
+    if (sscanf (argumentsLine.pointer, "%3s+%lf", registerName, immedArgument) == 2) {
         FIND_REGISTER ();
 
-        if (!isRamValue)
-            PrintRegisterAndImmed (spu, registerIndex, value);
-        else
-            value += spu->registerValues [registerIndex];
+        if (!isRamValue) {
+            RETURN (ArgumentsType) (REGISTER_ARGUMENT | IMMED_ARGUMENT);
+        } else {
+            *immedArgument += spu->registerValues [*registerArgument];
+        }
 
-    } else if (sscanf (argumentsLine.pointer, "%lf", &value) > 0) {
-        if (!isRamValue)
-            PrintImmed (value);
+    } else if (sscanf (argumentsLine.pointer, "%lf", immedArgument) > 0) {
+        if (!isRamValue) {
+            RETURN IMMED_ARGUMENT;
+        }
 
     } else if (sscanf (argumentsLine.pointer, "%3s", registerName) > 0) {
         FIND_REGISTER ();
 
-        if (!isRamValue)
-            PrintRegister (spu, registerIndex, registerName);
-        else
-            value = spu->registerValues [registerIndex];
+        if (!isRamValue) {
+            RETURN REGISTER_ARGUMENT;
+        } else {
+            *immedArgument = spu->registerValues [*registerArgument];
+        }
 
     } else {
         PrintErrorMessage (NO_PROCESSOR_ERRORS, "Wrong arguments prompt", DEBUGGER_ERROR_PREFIX, NULL, -1);
-        RETURN TOO_FEW_ARGUMENTS;
+        RETURN NO_ARGUMENTS;
     }
 
     if (isRamValue) {
-        PrintMemoryValue (spu, (ssize_t) value, argumentsLine.pointer);
+        RETURN MEMORY_ARGUMENT;
+    }
+
+    RETURN NO_ARGUMENTS;
+}
+
+static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const CommandCode *commandCode, elem_t **argumentPointer, elem_t *immedArgument, unsigned char *registerArgument) {
+    PushLog (3);
+
+    if (commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT) || commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT)) {
+        spu->tmpArgument = *immedArgument + spu->registerValues [*registerArgument];
+        *argumentPointer = &spu->tmpArgument;
+
+    } else if (commandCode->arguments & IMMED_ARGUMENT) {
+        *argumentPointer = immedArgument;
+
+    } else if (commandCode->arguments & REGISTER_ARGUMENT) {
+        *argumentPointer = spu->registerValues + *registerArgument;
+
+    } else {
+        RETURN NO_PROCESSOR_ERRORS;
+    }
+
+    if (commandCode->arguments & MEMORY_ARGUMENT) {
+        *argumentPointer = &spu->ram [(ssize_t) **argumentPointer];
+    }
+
+    RETURN NO_PROCESSOR_ERRORS;
+}
+
+static ProcessorErrorCode ExecuteCommand (SPU *spu, char *arguments) {
+    PushLog (3);
+
+    fprintf (stderr, "%s\n", arguments);
+
+    char *commandName = strtok (arguments, " ");
+    const AssemblerInstruction *command = FindInstructionByName (commandName);
+
+    if (!command) {
+        ProgramErrorCheck (TOO_FEW_ARGUMENTS, "Incorrect instruction");
+    }
+
+    unsigned char registerArgument = 0;
+    elem_t        immedArgument    = 0;
+
+    char registerName [MAX_REGISTER_NAME_LENGTH + 1] = "";
+
+    ArgumentsType argumentTypes = ParseCommandArguments (spu, strtok (NULL, " "), &registerArgument, &immedArgument, registerName);
+
+    CommandCode commandCode = {};
+    commandCode.opcode = command->commandCode.opcode;
+    commandCode.arguments = argumentTypes;
+
+    if ((~command->commandCode.arguments) & commandCode.arguments) {
+		ProgramErrorCheck (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments");
+	}
+
+    elem_t *argumentPointer = NULL;
+
+    ProgramErrorCheck (GetArgumentsPointer (spu, &commandCode, &argumentPointer, &immedArgument, &registerArgument), "Can not get argument pointer");
+
+    RETURN command->callbackFunction (spu, &commandCode, argumentPointer);
+}
+
+static ProcessorErrorCode PrintSpuData (SPU *spu, char *arguments) {
+    PushLog (3);
+
+    unsigned char registerArgument = 0;
+    elem_t        immedArgument    = 0;
+
+    char registerName [MAX_REGISTER_NAME_LENGTH + 1] = "";
+
+    ArgumentsType argumentTypes = ParseCommandArguments (spu, strtok (arguments, " "), &registerArgument, &immedArgument, registerName);
+
+    if (argumentTypes == (REGISTER_ARGUMENT | IMMED_ARGUMENT)) {
+        PrintRegisterAndImmed (spu, registerArgument, immedArgument);
+
+    } else if (argumentTypes == REGISTER_ARGUMENT) {
+        PrintRegister (spu, registerArgument, registerName);
+
+    } else if (argumentTypes == IMMED_ARGUMENT) {
+        PrintImmed (immedArgument);
+
+    } else if (argumentTypes == MEMORY_ARGUMENT) {
+        PrintMemoryValue (spu, (ssize_t) immedArgument, arguments);
+    } else {
+        ProgramErrorCheck (TOO_FEW_ARGUMENTS, "Invalid arguments set");
     }
 
     fprintf (stderr, "\n");
@@ -315,6 +387,23 @@ static ProcessorErrorCode PlaceBreakpoint (SPU *spu, char *arguments, Buffer <De
     }
 
     WriteDataToBuffer (breakpointsBuffer, foundAddress, 1);
+
+    RETURN NO_PROCESSOR_ERRORS;
+}
+
+ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, const char *filename) {
+    PushLog (3);
+
+    #define CheckError(function, msg)               \
+        if (!function)                              \
+            ProgramErrorCheck (NO_BUFFER, msg);
+
+
+    CheckError (CreateFileBuffer       (fileBuffer, filename),       "Error occuried while creating source file buffer")
+    CheckError (ReadFileLines          (filename, fileBuffer, text), "Error occuried while reading file lines");
+    CheckError (ChangeNewLinesToZeroes (text),                       "Error occuried while changing new line symbols to zero symbols");
+
+    #undef CheckError
 
     RETURN NO_PROCESSOR_ERRORS;
 }

@@ -33,6 +33,9 @@ push 0
 ja PlusD ; two solutions
 
 ZeroD:
+    push 1
+    out
+
     push 0
     push rbx
     sub         ; -b
@@ -50,25 +53,40 @@ Linear:
     push rbx
     je Constant   ; if a = 0 and b = 0
 
+    push 1
+    out
+
     push 0
     push rcx
     sub         ; -c
     push rbx
-    div         ; -c/b
+    div         ; -c / b
     out
     hlt
 
 Constant:
-    push NAN
+    push rcx
+    push 0
+    je Infinite
+
+    push 0
+    out
+    hlt
+
+Infinite:
+    push inf
     out
     hlt
 
 MinusD:
-    push NAN
+    push 0
     out
     hlt
 
 PlusD:
+    push 2
+    out
+
     push 0
     push rbx
     sub         ; -b

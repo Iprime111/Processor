@@ -46,7 +46,7 @@ ProcessorErrorCode RenderLoop (sf::RenderWindow* window, SPU *spu, sf::Mutex *wo
         }
 
         updateMutex.lock ();
-        for (size_t cellIndex = 0; cellIndex < VRAM_SIZE / 3; cellIndex++) {
+        for (size_t cellIndex = 0; cellIndex < PIXEL_COUNT; cellIndex++) {
             window->draw (memoryCells [cellIndex]);
         }
         updateMutex.unlock ();
@@ -62,29 +62,29 @@ ProcessorErrorCode RenderLoop (sf::RenderWindow* window, SPU *spu, sf::Mutex *wo
 ProcessorErrorCode InitCells () {
     PushLog (4);
 
-    //updateMutex.lock ();
+    updateMutex.lock ();
 
-    memoryCells = new sf::RectangleShape [VRAM_SIZE / 3];
+    memoryCells = new sf::RectangleShape [PIXEL_COUNT];
 
     if (!memoryCells) {
-        //updateMutex.unlock ();
+        updateMutex.unlock ();
         RETURN NO_BUFFER;
     }
 
-    for (size_t cellIndex = 0; cellIndex < VRAM_SIZE / 3; cellIndex++) {
+    for (size_t cellIndex = 0; cellIndex < PIXEL_COUNT; cellIndex++) {
 
         memoryCells [cellIndex].setPosition (LEFT_OFFSET + CELLS_DISTANCE * (float) (cellIndex / (size_t) CELLS_BY_LINE),
                                                 TOP_OFFSET + CELLS_DISTANCE * (float) (cellIndex % CELLS_BY_LINE));
 
         memoryCells [cellIndex].setFillColor    (sf::Color::Black);
 
-        memoryCells [cellIndex].setOutlineColor (OUTLINE_COLOR);
+        memoryCells [cellIndex].setOutlineColor     (OUTLINE_COLOR);
         memoryCells [cellIndex].setOutlineThickness (OUTLINE_THICKNESS);
 
         memoryCells [cellIndex].setSize ({CELL_SIZE, CELL_SIZE});
     }
 
-    //updateMutex.unlock ();
+    updateMutex.unlock ();
 
     RETURN NO_PROCESSOR_ERRORS;
 }
@@ -95,9 +95,10 @@ ProcessorErrorCode UpdateGraphics (SPU *spu, size_t ramAddress) {
     custom_assert (spu,      pointer_is_null, NO_PROCESSOR);
     custom_assert (spu->ram, pointer_is_null, NO_BUFFER);
 
-    size_t cellIndex = ramAddress / 3;
+    size_t cellIndex = ramAddress / COLOR_CHANNELS;
 
-    sf::Color color ((sf::Uint8) spu->ram [cellIndex * 3], (sf::Uint8) spu->ram [cellIndex * 3 + 1], (sf::Uint8) spu->ram [cellIndex * 3 + 2]);
+    sf::Color color ((sf::Uint8) spu->ram [cellIndex * COLOR_CHANNELS], (sf::Uint8) spu->ram [cellIndex * COLOR_CHANNELS + 1],
+                         (sf::Uint8) spu->ram [cellIndex * COLOR_CHANNELS + 2]);
 
     //updateMutex.lock ();
     memoryCells [cellIndex].setFillColor (color);

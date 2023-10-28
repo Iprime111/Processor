@@ -1,6 +1,6 @@
 import cv2
 
-vidcap = cv2.VideoCapture ('Gigachad2.mp4')
+vidcap = cv2.VideoCapture ('Gachi.mp4')
 outFile = '../tests/video.asm'
 
 success, image = vidcap.read ()
@@ -14,7 +14,7 @@ with open (outFile, 'w') as file:
         if count >= 3000:
             exit (0)
         count += 1
-        image = cv2.resize (image, dims, interpolation=cv2.INTER_AREA)
+        image = cv2.resize (image, dims, interpolation=cv2.INTER_LINEAR)
         rows, cols, _ = image.shape
 
         for i in range (rows):
