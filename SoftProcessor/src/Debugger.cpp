@@ -78,7 +78,7 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
         #define DEBUGGER_COMMAND_(name, shortName, ...)                               \
             if (!strcmp (commandName, name) || !strcmp (commandName, shortName)) {    \
                 __VA_ARGS__;                                                          \
-            }                                                                         
+            }
 
         DEBUGGER_COMMAND_ ("quit",       "q",  DestroyBufferAndReturn (QUIT_PROGRAM));
         DEBUGGER_COMMAND_ ("continue",   "c",  DestroyBufferAndReturn (CONTINUE_PROGRAM));
@@ -104,25 +104,17 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
 
 ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, const char *filename) {
     PushLog (3);
+
+    #define CheckError(function, msg)               \
+        if (!function)                              \
+            ProgramErrorCheck (NO_BUFFER, msg);
+
+
+    CheckError (CreateFileBuffer       (fileBuffer, filename),       "Error occuried while creating source file buffer")
+    CheckError (ReadFileLines          (filename, fileBuffer, text), "Error occuried while reading file lines");
+    CheckError (ChangeNewLinesToZeroes (text),                       "Error occuried while changing new line symbols to zero symbols");
     
-    // TODO
-    // #define check_err(func, msg)
-        // if (!func)
-            // ProgramErrorCheck (NO_BUFFER, msg);
-    // 
-    // check_err(CreateFileBuffer (fileBuffer, filename), "Error occuried while creating source file buffer")
-             
-	if (!CreateFileBuffer (fileBuffer, filename)) {
-        ProgramErrorCheck (NO_BUFFER, "Error occuried while creating source file buffer");
-    }
-
-    if (!ReadFileLines (filename, fileBuffer, text)) {
-        ProgramErrorCheck (NO_BUFFER, "Error occuried while reading file lines");
-    }
-
-    if (!ChangeNewLinesToZeroes (text)) {
-        ProgramErrorCheck (NO_BUFFER, "Error occuried while changing new line symbols to zero symbols");
-    }
+    #undef CheckError
 
     RETURN NO_PROCESSOR_ERRORS;
 }

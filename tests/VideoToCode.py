@@ -1,6 +1,6 @@
 import cv2
 
-vidcap = cv2.VideoCapture ('BadApple.mp4')
+vidcap = cv2.VideoCapture ('Gigachad2.mp4')
 outFile = '../tests/video.asm'
 
 success, image = vidcap.read ()
