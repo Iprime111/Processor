@@ -30,6 +30,7 @@ static void DumpMemory   (SPU *spu, char *arguments);
 static ProcessorErrorCode GetDumpArguments (char *arguments, ssize_t *dumpAddress, ssize_t *dumpSize, ssize_t maxSize);
 
 static void PrintMemoryValue      (SPU *spu, ssize_t address, char *arguments);
+static void DumpMemory            (SPU *spu, char *arguments);
 static void PrintRegister         (SPU *spu, unsigned char registerIndex, char *registerName);
 static void PrintRegisterAndImmed (SPU *spu, unsigned char registerIndex, elem_t value);
 static void PrintImmed            (elem_t value);
@@ -77,9 +78,9 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
         #define DEBUGGER_COMMAND_(name, shortName, ...)                               \
             if (!strcmp (commandName, name) || !strcmp (commandName, shortName)) {    \
                 __VA_ARGS__;                                                          \
-            }                                                                         \
+            }                                                                         
 
-        DEBUGGER_COMMAND_ ("quit",       "q",  DestroyBufferAndReturn (QUIT_PROGRAM))
+        DEBUGGER_COMMAND_ ("quit",       "q",  DestroyBufferAndReturn (QUIT_PROGRAM));
         DEBUGGER_COMMAND_ ("continue",   "c",  DestroyBufferAndReturn (CONTINUE_PROGRAM));
         DEBUGGER_COMMAND_ ("run",        "r",  DestroyBufferAndReturn (RUN_PROGRAM));
         DEBUGGER_COMMAND_ ("step",       "s",  DestroyBufferAndReturn (STEP_PROGRAM));
@@ -88,6 +89,7 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
         DEBUGGER_COMMAND_ ("memory",     "m",  {DumpMemory      (spu, argumentsLine);                                     free (input); continue;});
         DEBUGGER_COMMAND_ ("bytecode",   "by", {DumpBytecode    (spu, argumentsLine);                                     free (input); continue;});
         DEBUGGER_COMMAND_ ("telescope",  "t",  {DumpStackData   (&spu->processorStack);                                   free (input); continue;});
+
 
         PrintErrorMessage (NO_PROCESSOR_ERRORS, "Please enter valid command", DEBUGGER_ERROR_PREFIX, NULL, -1);
 
@@ -102,7 +104,14 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
 
 ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, const char *filename) {
     PushLog (3);
-
+    
+    // TODO
+    // #define check_err(func, msg)
+        // if (!func)
+            // ProgramErrorCheck (NO_BUFFER, msg);
+    // 
+    // check_err(CreateFileBuffer (fileBuffer, filename), "Error occuried while creating source file buffer")
+             
 	if (!CreateFileBuffer (fileBuffer, filename)) {
         ProgramErrorCheck (NO_BUFFER, "Error occuried while creating source file buffer");
     }
@@ -119,12 +128,14 @@ ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, con
 }
 
 static void DumpBytecode (SPU *spu, char *arguments) {
+
     PushLog (3);
 
     custom_assert (arguments, pointer_is_null, (void)0);
 
     ssize_t dumpAddress = 0;
     ssize_t dumpSize    = 0;
+
 
     if (GetDumpArguments (arguments, &dumpAddress, &dumpSize, spu->bytecode.buffer_size) != NO_PROCESSOR_ERRORS) {
         RETURN;

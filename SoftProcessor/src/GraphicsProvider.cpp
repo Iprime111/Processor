@@ -54,7 +54,6 @@ ProcessorErrorCode RenderLoop (sf::RenderWindow* window, SPU *spu, sf::Mutex *wo
         window->display ();
     }
 
-
     delete [] memoryCells;
 
     RETURN NO_PROCESSOR_ERRORS;
