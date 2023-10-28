@@ -30,7 +30,6 @@ static void DumpMemory   (SPU *spu, char *arguments);
 static ProcessorErrorCode GetDumpArguments (char *arguments, ssize_t *dumpAddress, ssize_t *dumpSize, ssize_t maxSize);
 
 static void PrintMemoryValue      (SPU *spu, ssize_t address, char *arguments);
-static void DumpMemory            (SPU *spu, char *arguments);
 static void PrintRegister         (SPU *spu, unsigned char registerIndex, char *registerName);
 static void PrintRegisterAndImmed (SPU *spu, unsigned char registerIndex, elem_t value);
 static void PrintImmed            (elem_t value);
@@ -88,7 +87,7 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
 DebuggerAction BreakpointStop (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, const DebugInfoChunk *breakpointData, TextBuffer *text) {
     PushLog (2);
 
-    fprintf (stderr, "Break: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Ip:     " BOLD_WHITE_COLOR "%lu\n", text->lines [breakpointData->line - 1].pointer, breakpointData->address);
+    fprintf (stderr, "\nBreak: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Ip:     " BOLD_WHITE_COLOR "%lu\n", text->lines [breakpointData->line - 1].pointer, breakpointData->address);
 
     RETURN DebugConsole (spu, debugInfoBuffer, breakpointsBuffer);
 }
@@ -133,7 +132,7 @@ static void DumpBytecode (SPU *spu, char *arguments) {
         const ssize_t NumberFieldSize = 8;
         ssize_t offset = (byteIndex - dumpAddress) * NumberFieldSize + TitleFieldSize;
 
-        if (spu->ip == byteIndex) {
+        if ((ssize_t) spu->ip == byteIndex) {
             fprintf_color (CONSOLE_BLUE, CONSOLE_BOLD, stderr, "\r" MOVE_CURSOR_DOWN (2) MOVE_CURSOR_FORWARD (%ld) "^" MOVE_CURSOR_UP (2), offset);
         }
 
