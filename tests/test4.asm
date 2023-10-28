@@ -1,11 +1,11 @@
 Begin:
     push rax
-    push 1200
+    push 30000
 
     jb Continue
 
-    push 0
-    pop rax
+    in
+    hlt
 
 Continue:
     call IncrementColor
@@ -19,7 +19,7 @@ IncrementCell:
 
 IncrementColor:
     push [rax]
-    push 1
+    push 255
     add
     pop [rax]
     ret

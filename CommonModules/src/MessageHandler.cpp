@@ -74,9 +74,9 @@ static void PrintErrorCode (FILE *stream, ProcessorMessage *message, CONSOLE_COL
                     fprintf_color (color, CONSOLE_NORMAL, stream, " " #patternCode ": " WHITE_COLOR message "\n");  \
                 }
 
-    MSG_ (message->errorCode, WRONG_INSTRUCTION,  "Readed instruction do not exist");
-    MSG_ (message->errorCode, BUFFER_ENDED,       "Command buffer ended");
-    MSG_ (message->errorCode, NO_BUFFER,          "Command buffer do not exist");
+    MSG_ (message->errorCode, WRONG_INSTRUCTION,  "Read instruction do not exist");
+    MSG_ (message->errorCode, BUFFER_ENDED,       "Current buffer ended");
+    MSG_ (message->errorCode, NO_BUFFER,          "Current buffer do not exist");
     MSG_ (message->errorCode, STACK_ERROR,        "Error occuried in processor stack");
     MSG_ (message->errorCode, PROCESSOR_HALT,     "Halt command has been detected");
     MSG_ (message->errorCode, TOO_MANY_ARGUMENTS, "Given instruction requires less arguments to be passed");

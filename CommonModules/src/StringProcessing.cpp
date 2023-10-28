@@ -58,14 +58,13 @@ ssize_t FindActualStringBegin (TextLine *line) {
 
 #undef DetectWhitespacePosition
 
-bool IsLabelLine (TextLine *line, char *labelName, int *labelNameLength) {
+bool IsLabelLine (TextLine *line, char *labelName) {
     PushLog (4);
 
     custom_assert (line,            pointer_is_null, false);
     custom_assert (line->pointer,   pointer_is_null, false);
-    custom_assert (labelNameLength, pointer_is_null, false);
 
-    RETURN line->pointer [FindActualStringEnd (line)] == ':' && sscanf (line->pointer, "%s%n", labelName, labelNameLength) > 0;
+    RETURN line->pointer [FindActualStringEnd (line)] == ':' && sscanf (line->pointer, " %s", labelName) > 0;
 }
 
 ProcessorErrorCode DeleteExcessWhitespaces (TextBuffer *lines) {
