@@ -27,13 +27,13 @@
 
 static DebuggerAction ExecuteProgram (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, TextBuffer *sourceText);
 
+static ProcessorErrorCode GetArgumentsPointer  (SPU *spu, const AssemblerInstruction *instruction, const CommandCode *commandCode, elem_t **argumentPointer);
+
 static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *breakpointsBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, TextBuffer *sourceText, bool *doStep);
 static ProcessorErrorCode ReadHeader      (SPU *spu, Header *readHeader);
 static ProcessorErrorCode ReadDebugInfo   (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Header *header, char *sourcePath);
 
 static ProcessorErrorCode GenerateDisassembly (TextBuffer *disassemblyText, FileBuffer *disassemblyBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, char *binaryFilepath);
-
-static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *instruction, const CommandCode *commandCode, elem_t **argumentPointer);
 
 ProcessorErrorCode LaunchProgram (SPU *spu, char *sourceFilename, char *binaryFilename, sf::Mutex *workMutex) {
   	PushLog (1);
@@ -294,7 +294,7 @@ static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *br
 
 	elem_t *argumentPointer = NULL;
 
-	GetArguments (spu, instruction, &commandCode, &argumentPointer);
+	GetArgumentsPointer (spu, instruction, &commandCode, &argumentPointer);
 
 	ON_DEBUG (
         char message [MAX_MESSAGE_LENGTH] = "";
@@ -311,7 +311,7 @@ static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *br
 	RETURN operationErrorCode;
 }
 
-static ProcessorErrorCode GetArguments (SPU *spu, const AssemblerInstruction *instruction, const CommandCode *commandCode, elem_t **argumentPointer) {
+static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const AssemblerInstruction *instruction, const CommandCode *commandCode, elem_t **argumentPointer) {
 	PushLog (2);
 
 	if ((~instruction->commandCode.arguments) & commandCode->arguments) {

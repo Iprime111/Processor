@@ -122,13 +122,13 @@ static bool PrepareForAssembling (FileBuffer *fileBuffer, TextBuffer *textBuffer
     }
 
     if ((*binaryDescriptor = OpenFileWrite (BinaryFile)) == -1) {
-            PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while opening binary file", NULL, NULL, -1);
+            PrintErrorMessage (OUTPUT_FILE_ERROR, "Error occuried while opening binary file", NULL, NULL, -1);
             RETURN false;
         }
 
     if (ListingFile) {
         if ((*listingDescriptor = OpenFileWrite (ListingFile)) == -1) {
-            PrintErrorMessage (INPUT_FILE_ERROR, "Error occuried while opening listing file", NULL, NULL, -1);
+            PrintErrorMessage (OUTPUT_FILE_ERROR, "Error occuried while opening listing file", NULL, NULL, -1);
             RETURN false;
         }
     }else {
