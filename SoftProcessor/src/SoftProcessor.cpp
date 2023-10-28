@@ -347,6 +347,10 @@ static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const AssemblerInstruct
 			usleep (spu->frequencySleep);
 		}
 
+		if ((ssize_t) **argumentPointer < 0 || (ssize_t) **argumentPointer >= (ssize_t) (RAM_SIZE + VRAM_SIZE)) {
+			ProgramErrorCheck (TOO_FEW_ARGUMENTS, "Wrong memory address access attempt");
+		}
+
 		*argumentPointer = (spu->ram + (size_t) **argumentPointer);
 	}
 

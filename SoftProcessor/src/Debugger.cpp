@@ -188,6 +188,10 @@ static ProcessorErrorCode GetDumpArguments (char *arguments, ssize_t *dumpAddres
 static ArgumentsType ParseCommandArguments (SPU *spu, char *arguments, unsigned char *registerArgument, elem_t *immedArgument, char *registerName) {
     PushLog (3);
 
+    if (!arguments) {
+        RETURN NO_ARGUMENTS;
+    }
+
     TextLine argumentsLine = {arguments, strlen (arguments)};
 
     bool isRamValue = HasRamBrackets (&argumentsLine);
@@ -206,25 +210,33 @@ static ArgumentsType ParseCommandArguments (SPU *spu, char *arguments, unsigned 
                 RETURN NO_ARGUMENTS;                                                                            \
             }
 
+    ArgumentsType type = NO_ARGUMENTS;
+
     if (sscanf (argumentsLine.pointer, "%3s+%lf", registerName, immedArgument) == 2) {
         FIND_REGISTER ();
 
+        type = (ArgumentsType) (REGISTER_ARGUMENT | IMMED_ARGUMENT);
+
         if (!isRamValue) {
-            RETURN (ArgumentsType) (REGISTER_ARGUMENT | IMMED_ARGUMENT);
+            RETURN type;
         } else {
             *immedArgument += spu->registerValues [*registerArgument];
         }
 
     } else if (sscanf (argumentsLine.pointer, "%lf", immedArgument) > 0) {
+        type = IMMED_ARGUMENT;
+
         if (!isRamValue) {
-            RETURN IMMED_ARGUMENT;
+            RETURN type;
         }
 
     } else if (sscanf (argumentsLine.pointer, "%3s", registerName) > 0) {
         FIND_REGISTER ();
 
+        type = REGISTER_ARGUMENT;
+
         if (!isRamValue) {
-            RETURN REGISTER_ARGUMENT;
+            RETURN type;
         } else {
             *immedArgument = spu->registerValues [*registerArgument];
         }
@@ -235,7 +247,7 @@ static ArgumentsType ParseCommandArguments (SPU *spu, char *arguments, unsigned 
     }
 
     if (isRamValue) {
-        RETURN MEMORY_ARGUMENT;
+        RETURN (ArgumentsType) (type | MEMORY_ARGUMENT);
     }
 
     RETURN NO_ARGUMENTS;
@@ -259,6 +271,10 @@ static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const CommandCode *comm
     }
 
     if (commandCode->arguments & MEMORY_ARGUMENT) {
+        if ((ssize_t) **argumentPointer < 0 || (ssize_t) **argumentPointer >= (ssize_t) (RAM_SIZE + VRAM_SIZE)) {
+			ProgramErrorCheck (TOO_FEW_ARGUMENTS, "Wrong memory address access attempt");
+		}
+
         *argumentPointer = &spu->ram [(ssize_t) **argumentPointer];
     }
 
@@ -274,7 +290,7 @@ static ProcessorErrorCode ExecuteCommand (SPU *spu, char *arguments) {
     const AssemblerInstruction *command = FindInstructionByName (commandName);
 
     if (!command) {
-        ProgramErrorCheck (TOO_FEW_ARGUMENTS, "Incorrect instruction");
+        ProgramErrorCheck (WRONG_INSTRUCTION, "Incorrect instruction");
     }
 
     unsigned char registerArgument = 0;
@@ -309,17 +325,18 @@ static ProcessorErrorCode PrintSpuData (SPU *spu, char *arguments) {
 
     ArgumentsType argumentTypes = ParseCommandArguments (spu, strtok (arguments, " "), &registerArgument, &immedArgument, registerName);
 
-    if (argumentTypes == (REGISTER_ARGUMENT | IMMED_ARGUMENT)) {
+    if (argumentTypes & MEMORY_ARGUMENT) {
+        PrintMemoryValue (spu, (ssize_t) immedArgument, arguments);
+
+    } else if (argumentTypes == (REGISTER_ARGUMENT | IMMED_ARGUMENT)) {
         PrintRegisterAndImmed (spu, registerArgument, immedArgument);
 
-    } else if (argumentTypes == REGISTER_ARGUMENT) {
+    } else if (argumentTypes & REGISTER_ARGUMENT) {
         PrintRegister (spu, registerArgument, registerName);
 
-    } else if (argumentTypes == IMMED_ARGUMENT) {
+    } else if (argumentTypes & IMMED_ARGUMENT) {
         PrintImmed (immedArgument);
 
-    } else if (argumentTypes == MEMORY_ARGUMENT) {
-        PrintMemoryValue (spu, (ssize_t) immedArgument, arguments);
     } else {
         ProgramErrorCheck (TOO_FEW_ARGUMENTS, "Invalid arguments set");
     }

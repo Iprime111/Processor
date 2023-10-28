@@ -1,0 +1,27 @@
+HEADER:
+	signature: TM
+	version: 1.5.5
+	byteOrder: LITTLE ENDIAN
+
+
+ ip 	disassembly
+0000	in 
+0001	pop rax
+0003	push rax
+0005	push 1.000000
+0014	jb 82
+0023	push rax
+0025	call 36
+0034	out 
+0035	hlt 
+0036	pop rax
+0038	push rax
+0040	push rax
+0042	push 1.000000
+0051	ja 61
+0060	ret 
+0061	push rax+-1.000000
+0071	call 36
+0080	mul 
+0081	ret 
+0082	hlt 
