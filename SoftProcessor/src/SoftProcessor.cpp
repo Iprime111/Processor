@@ -27,15 +27,19 @@
 #include "SPU.h"
 #include "DSLFunctions.h"
 
-static DebuggerAction ExecuteProgram (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, TextBuffer *sourceText);
+static DebuggerAction ExecuteProgram (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
+										Buffer <DebugInfoChunk> *breakpointsBuffer, TextBuffer *sourceText);
 
-static ProcessorErrorCode GetArgumentsPointer  (SPU *spu, const AssemblerInstruction *instruction, const CommandCode *commandCode, elem_t **argumentPointer);
+static ProcessorErrorCode GetArgumentsPointer  (SPU *spu, const AssemblerInstruction *instruction,
+												const CommandCode *commandCode, elem_t **argumentPointer);
 
-static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *breakpointsBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, TextBuffer *sourceText, bool *doStep);
 static ProcessorErrorCode ReadHeader      (SPU *spu, Header *readHeader);
 static ProcessorErrorCode ReadDebugInfo   (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Header *header, char *sourcePath);
+static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *breakpointsBuffer,
+												Buffer <DebugInfoChunk> *debugInfoBuffer, TextBuffer *sourceText, bool *doStep);
 
-static ProcessorErrorCode GenerateDisassembly (TextBuffer *disassemblyText, FileBuffer *disassemblyBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, char *binaryFilepath);
+static ProcessorErrorCode GenerateDisassembly (TextBuffer *disassemblyText, FileBuffer *disassemblyBuffer,
+												Buffer <DebugInfoChunk> *debugInfoBuffer, char *binaryFilepath);
 
 ProcessorErrorCode LaunchProgram (SPU *spu, char *sourceFilename, char *binaryFilename, sf::Mutex *workMutex) {
   	PushLog (1);
@@ -118,7 +122,8 @@ ProcessorErrorCode LaunchProgram (SPU *spu, char *sourceFilename, char *binaryFi
 	#undef FreeDataAndReturnIfErrors
 }
 
-static DebuggerAction ExecuteProgram (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, TextBuffer *sourceText) {
+static DebuggerAction ExecuteProgram (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
+										Buffer <DebugInfoChunk> *breakpointsBuffer, TextBuffer *sourceText) {
 	PushLog (1);
 
 	custom_assert (spu, 				  	pointer_is_null, QUIT_PROGRAM);
@@ -148,7 +153,8 @@ static DebuggerAction ExecuteProgram (SPU *spu, Buffer <DebugInfoChunk> *debugIn
 	RETURN QUIT_PROGRAM;
 }
 
-static ProcessorErrorCode GenerateDisassembly (TextBuffer *disassemblyText, FileBuffer *disassemblyBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, char *binaryFilepath) {
+static ProcessorErrorCode GenerateDisassembly (TextBuffer *disassemblyText, FileBuffer *disassemblyBuffer,
+												Buffer <DebugInfoChunk> *debugInfoBuffer, char *binaryFilepath) {
 	PushLog (2);
 
 	char disassemblyPath [FILENAME_MAX] = "";
@@ -158,6 +164,7 @@ static ProcessorErrorCode GenerateDisassembly (TextBuffer *disassemblyText, File
 	char message [FILENAME_MAX] = "";
 	sprintf (message, "No debug info has been found. Generating disassembly... Disassembly adress:");
 	PrintWarningMessage (NO_PROCESSOR_ERRORS, message, NULL, NULL, -1);
+	
 	snprintf (message, FILENAME_MAX, "%s", disassemblyPath);
 	PrintWarningMessage (NO_PROCESSOR_ERRORS, message, NULL, NULL, -1);
 
@@ -250,7 +257,8 @@ static ProcessorErrorCode ReadDebugInfo (SPU *spu, Buffer <DebugInfoChunk> *debu
 	RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *breakpointsBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, TextBuffer *sourceText, bool *doStep) {
+static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *breakpointsBuffer,
+											Buffer <DebugInfoChunk> *debugInfoBuffer, TextBuffer *sourceText, bool *doStep) {
 	PushLog (2);
 
 	CheckBuffer (spu);
@@ -314,7 +322,8 @@ static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *br
 	RETURN operationErrorCode;
 }
 
-static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const AssemblerInstruction *instruction, const CommandCode *commandCode, elem_t **argumentPointer) {
+static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const AssemblerInstruction *instruction,
+												const CommandCode *commandCode, elem_t **argumentPointer) {
 	PushLog (2);
 
 	if ((~instruction->commandCode.arguments) & commandCode->arguments) {
@@ -337,7 +346,7 @@ static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const AssemblerInstruct
 		spu->tmpArgument = spu->registerValues [registerIndex] + immedArgument;
 
 		*argumentPointer = &spu->tmpArgument;
-		
+
 	}else if (commandCode->arguments & REGISTER_ARGUMENT) {
 		ReadData (spu, &registerIndex, unsigned char);
 

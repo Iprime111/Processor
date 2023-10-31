@@ -27,30 +27,24 @@ const size_t MAX_LABELS_COUNT    = 128;
 
 static ProcessorErrorCode DoCompilationPass (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer,
                                                 Buffer <Label> *labelsBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, TextBuffer *text, size_t *commandsCount);
-
 static ProcessorErrorCode CompileLine       (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer,
                                                 Buffer <Label> *labelsBuffer, Buffer <DebugInfoChunk> *debugInfoBuffer, TextLine *line, int lineNumber);
 
-static ProcessorErrorCode CompileInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int lineNumber);
-
+static ProcessorErrorCode CompileInstructionOpcode        (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int lineNumber);
 static ProcessorErrorCode CompileInstructionArgumentsData (AssemblerInstruction *instruction, TextLine *line, InstructionArguments *arguments,
                                                                 ArgumentsType permittedArguments, Buffer <Label> *labelsBuffer, int lineNumber);
 
 static ProcessorErrorCode ReadRamBrackets (AssemblerInstruction *instruction, TextLine *line, ssize_t *offset, ArgumentsType permittedArguments, int lineNumber);
 
-static ProcessorErrorCode SaveLabel (Buffer <char> *binaryBuffer, Buffer <Label> *labelsBuffer, TextLine *sourceLine, char *labelName);
-
-static ProcessorErrorCode EmitLabelListing       (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, TextLine *sourceLine, int lineNumber);
-
-static ProcessorErrorCode EmitInstructionListing (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, AssemblerInstruction *instruction,
+static ProcessorErrorCode SaveLabel              (Buffer <char> *binaryBuffer, Buffer <Label> *labelsBuffer,  TextLine *sourceLine, char *labelName);
+static ProcessorErrorCode EmitLabelListing       (Buffer <char> *binaryBuffer, Buffer <char>  *listingBuffer, TextLine *sourceLine, int   lineNumber);
+static ProcessorErrorCode EmitInstructionListing (Buffer <char> *binaryBuffer, Buffer <char>  *listingBuffer, AssemblerInstruction *instruction,
                                                     InstructionArguments *arguments, TextLine *sourceLine, int lineNumber);
-
 static ProcessorErrorCode EmitInstructionBinary  (Buffer <char> *binaryBuffer, AssemblerInstruction *instruction,
                                                     InstructionArguments *arguments, TextLine *sourceLine, int lineNumber);
 
 static ProcessorErrorCode CreateAssemblyBuffers  (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer,
                                                     FileBuffer *sourceFile, TextBuffer *sourceText);
-
 static ProcessorErrorCode DestroyAssemblyBuffers (Buffer <char> *binaryBuffer, Buffer <char> *listingBuffer, Buffer <Label> *labelsBuffer);
 
 ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryDescriptor, int listingDescriptor) {
@@ -83,16 +77,20 @@ ProcessorErrorCode AssembleFile (TextBuffer *text, FileBuffer *file, int binaryD
             }                                                                                                                           \
         } while (0)
 
-    TerminateIfErrorsWereFound("Compilation error", DoCompilationPass (&binaryBuffer, &listingBuffer, &labelsBuffer, NULL, text, &commandsCount));
+    TerminateIfErrorsWereFound("Compilation error", DoCompilationPass (&binaryBuffer, &listingBuffer, &labelsBuffer,
+                                    NULL, text, &commandsCount));
 
     InitBuffer (&debugInfoBuffer, commandsCount);
 
-    TerminateIfErrorsWereFound ("Compilation error", DoCompilationPass( &binaryBuffer, &listingBuffer, &labelsBuffer, &debugInfoBuffer, text, NULL));
-    TerminateIfErrorsWereFound ("Error occuried while writing data to output file", WriteDataToFiles (&binaryBuffer, &listingBuffer, &debugInfoBuffer, binaryDescriptor, listingDescriptor));
+    TerminateIfErrorsWereFound ("Compilation error", DoCompilationPass( &binaryBuffer, &listingBuffer, &labelsBuffer,
+                                    &debugInfoBuffer, text, NULL));
+    TerminateIfErrorsWereFound ("Error occuried while writing data to output file", WriteDataToFiles (&binaryBuffer, &listingBuffer,
+                                    &debugInfoBuffer, binaryDescriptor, listingDescriptor));
 
     #undef TerminateIfErrorsWereFound
 
-    ProgramErrorCheck (DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer, &labelsBuffer), "Error occuried while destroying assembly buffers");
+    ProgramErrorCheck (DestroyAssemblyBuffers (&binaryBuffer, &listingBuffer, &labelsBuffer),
+                            "Error occuried while destroying assembly buffers");
     DestroyBuffer (&debugInfoBuffer);
 
     PrintSuccessMessage ("Assembly finished successfully!", NULL);
@@ -180,7 +178,8 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
 
     if (debugInfoBuffer && IsDebugMode ()) {
         DebugInfoChunk commandDebugInfo = {binaryBuffer->currentIndex, lineNumber};
-        ProgramErrorCheck (WriteDataToBuffer (debugInfoBuffer, &commandDebugInfo, 1), "Error occuried while writing debug information to a buffer");
+        ProgramErrorCheck (WriteDataToBuffer (debugInfoBuffer, &commandDebugInfo, 1),
+                            "Error occuried while writing debug information to a buffer");
     }
 
     ProgramErrorCheck (EmitInstructionBinary  (binaryBuffer,                &outputInstruction, &arguments, line, lineNumber),
@@ -191,7 +190,8 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode CompileInstructionOpcode (TextLine *line, AssemblerInstruction *instruction, ArgumentsType *permittedArguments, int lineNumber) {
+static ProcessorErrorCode CompileInstructionOpcode (TextLine *line, AssemblerInstruction *instruction,
+                                                        ArgumentsType *permittedArguments, int lineNumber) {
     PushLog (3);
 
     custom_assert (instruction, pointer_is_null, WRONG_INSTRUCTION);
@@ -220,7 +220,8 @@ static ProcessorErrorCode CompileInstructionOpcode (TextLine *line, AssemblerIns
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode ReadRamBrackets (AssemblerInstruction *instruction, TextLine *line, ssize_t *offset, ArgumentsType permittedArguments, int lineNumber) {
+static ProcessorErrorCode ReadRamBrackets (AssemblerInstruction *instruction, TextLine *line, ssize_t *offset,
+                                            ArgumentsType permittedArguments, int lineNumber) {
     PushLog (4);
 
     ssize_t end = FindActualStringEnd (line);
@@ -284,7 +285,9 @@ static ProcessorErrorCode CompileInstructionArgumentsData (AssemblerInstruction 
 
     switch (argumentsCount) {
         case 2:
-            if (permittedArguments != (REGISTER_ARGUMENT | IMMED_ARGUMENT) && permittedArguments != (REGISTER_ARGUMENT | IMMED_ARGUMENT | MEMORY_ARGUMENT)) {
+            if (permittedArguments != (REGISTER_ARGUMENT | IMMED_ARGUMENT) &&
+                    permittedArguments != (REGISTER_ARGUMENT | IMMED_ARGUMENT | MEMORY_ARGUMENT)) {
+
                 SyntaxErrorCheck (WRONG_INSTRUCTION, "Instruction does not takes this set of arguments", line, lineNumber);
             }
 
@@ -374,8 +377,11 @@ static ProcessorErrorCode EmitLabelListing (Buffer <char> *binaryBuffer, Buffer 
     const size_t ServiceInfoLength = 30;
     char listingInfoBuffer [MAX_INSTRUCTION_LENGTH + ServiceInfoLength] = "";
 
-    sprintf (listingInfoBuffer, "%.4lu\t--\t\t%.4d\t%s\n", binaryBuffer->currentIndex, lineNumber, sourceLine->pointer + FindActualStringBegin (sourceLine));
-    WriteDataToBufferErrorCheck ("Error occuried while writing label to listing buffer", listingBuffer, listingInfoBuffer, strlen (listingInfoBuffer));
+    sprintf (listingInfoBuffer, "%.4lu\t--\t\t%.4d\t%s\n", binaryBuffer->currentIndex,
+                lineNumber, sourceLine->pointer + FindActualStringBegin (sourceLine));
+
+    WriteDataToBufferErrorCheck ("Error occuried while writing label to listing buffer",
+                                    listingBuffer, listingInfoBuffer, strlen (listingInfoBuffer));
 
     RETURN NO_PROCESSOR_ERRORS;
 }
@@ -390,12 +396,14 @@ static ProcessorErrorCode EmitInstructionBinary (Buffer <char> *binaryBuffer, As
     custom_assert (binaryBuffer,       pointer_is_null, NO_BUFFER);
     custom_assert (binaryBuffer->data, pointer_is_null, NO_BUFFER);
 
-    WriteDataToBufferErrorCheck ("Error occuried while writing instruction to binary buffer", binaryBuffer, &instruction->commandCode, sizeof (CommandCode));
+    WriteDataToBufferErrorCheck ("Error occuried while writing instruction to binary buffer",
+                                    binaryBuffer, &instruction->commandCode, sizeof (CommandCode));
 
     ON_DEBUG (char message [128] = "Arguments: ");
 
     if (instruction->commandCode.arguments & REGISTER_ARGUMENT) {
-        WriteDataToBufferErrorCheck ("Error occuried while writing register number to binary buffer", binaryBuffer, &arguments->registerIndex, sizeof (char));
+        WriteDataToBufferErrorCheck ("Error occuried while writing register number to binary buffer",
+                                        binaryBuffer, &arguments->registerIndex, sizeof (char));
 
         ON_DEBUG (
             const Register *foundRegister = FindRegisterByIndex (arguments->registerIndex);
@@ -404,7 +412,8 @@ static ProcessorErrorCode EmitInstructionBinary (Buffer <char> *binaryBuffer, As
     }
 
     if (instruction->commandCode.arguments & IMMED_ARGUMENT) {
-        WriteDataToBufferErrorCheck ("Error occuried while writing immed argument to binary buffer", binaryBuffer, &arguments->immedArgument, sizeof (elem_t));
+        WriteDataToBufferErrorCheck ("Error occuried while writing immed argument to binary buffer",
+                                            binaryBuffer, &arguments->immedArgument, sizeof (elem_t));
 
         ON_DEBUG (sprintf (message + strlen (message), "%lf (size = %lu)", arguments->immedArgument, sizeof (elem_t)));
     }
@@ -453,7 +462,8 @@ static ProcessorErrorCode CreateAssemblyBuffers (Buffer <char> *binaryBuffer, Bu
     // max allocation coefficient = 9 / 4 = 2.25 ---> coef = 3
     const size_t MaxBinaryAllocationCoefficient = 3;
 
-    ProgramErrorCheck (InitBuffer (binaryBuffer, (size_t) sourceFile->buffer_size * MaxBinaryAllocationCoefficient), "Unable to create binary file buffer");
+    ProgramErrorCheck (InitBuffer (binaryBuffer, (size_t) sourceFile->buffer_size * MaxBinaryAllocationCoefficient),
+                                    "Unable to create binary file buffer");
 
     //Listing format:
     // ip   opcode  line
@@ -469,7 +479,8 @@ static ProcessorErrorCode CreateAssemblyBuffers (Buffer <char> *binaryBuffer, Bu
 
     const size_t MaxHeaderAllocationCoefficient = 2;
 
-    ProgramErrorCheck (InitBuffer (listingBuffer, listingAllocationSize + sizeof (Header) * MaxHeaderAllocationCoefficient), "Unable to create listing file buffer");
+    ProgramErrorCheck (InitBuffer (listingBuffer, listingAllocationSize + sizeof (Header) * MaxHeaderAllocationCoefficient),
+                                    "Unable to create listing file buffer");
 
     // Allocating labels buffer
 

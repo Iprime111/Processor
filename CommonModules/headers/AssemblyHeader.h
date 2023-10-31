@@ -11,7 +11,7 @@
     const char SYSTEM_BYTE_ORDER [] = "BIG ENDIAN";
 #endif
 
-const char VERSION [] = "1.5.5";
+const char VERSION [] = "1.9.0";
 const short int DEFAULT_SIGNATURE = 0x4d54;
 
 struct Header {
