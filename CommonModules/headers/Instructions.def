@@ -1,11 +1,10 @@
-//INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK, DISASSEMBLER_CALLBACK)
+//INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, DISASSEMBLER_CALLBACK)
 
-#include "CommonModules.h"
 #define COMMA ,
 
 INSTRUCTION (hlt, {0 COMMA NO_ARGUMENTS}, {
     RETURN PROCESSOR_HALT;
-}, {}, {})
+}, {})
 
 INSTRUCTION (out, {1 COMMA NO_ARGUMENTS}, {
     elem_t value {};
@@ -23,7 +22,7 @@ INSTRUCTION (out, {1 COMMA NO_ARGUMENTS}, {
     printf (MOVE_CURSOR_DOWN (1) "\r");
 
     fputs ("\n", stdout);
-}, {}, {})
+}, {})
 
 INSTRUCTION (in, {2 COMMA NO_ARGUMENTS}, {
     elem_t value {};
@@ -41,15 +40,15 @@ INSTRUCTION (in, {2 COMMA NO_ARGUMENTS}, {
 
     PushValue (spu, value);
 
-}, {}, {})
+}, {})
 
 INSTRUCTION (push, {3 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     PushValue (spu, *argument);
-}, {}, {})
+}, {})
 
 INSTRUCTION (pop, {4 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     PopValue (spu, argument);
-}, {}, {})
+}, {})
 
 INSTRUCTION (add, {5 COMMA NO_ARGUMENTS}, {
     elem_t value1 {};
@@ -59,7 +58,7 @@ INSTRUCTION (add, {5 COMMA NO_ARGUMENTS}, {
     PopValue (spu, &value2);
 
     PushValue (spu, value1 + value2);
-}, {}, {})
+}, {})
 
 INSTRUCTION (sub, {6 COMMA NO_ARGUMENTS}, {
     elem_t value1 {};
@@ -69,7 +68,7 @@ INSTRUCTION (sub, {6 COMMA NO_ARGUMENTS}, {
     PopValue (spu, &value2);
 
     PushValue (spu, value2 - value1);
-}, {}, {})
+}, {})
 
 INSTRUCTION (mul, {7 COMMA NO_ARGUMENTS}, {
     elem_t value1 {};
@@ -79,7 +78,7 @@ INSTRUCTION (mul, {7 COMMA NO_ARGUMENTS}, {
     PopValue (spu, &value2);
 
     PushValue (spu, value1 * value2);
-}, {}, {})
+}, {})
 
 INSTRUCTION (div, {8 COMMA NO_ARGUMENTS}, {
     elem_t value1 {};
@@ -89,7 +88,7 @@ INSTRUCTION (div, {8 COMMA NO_ARGUMENTS}, {
     PopValue (spu, &value2);
 
     PushValue (spu, value2 / value1);
-}, {}, {})
+}, {})
 
 INSTRUCTION (sin, {9 COMMA NO_ARGUMENTS}, {
     elem_t value {};
@@ -97,7 +96,7 @@ INSTRUCTION (sin, {9 COMMA NO_ARGUMENTS}, {
     PopValue (spu, &value);
 
     PushValue (spu, sin (value));
-}, {}, {})
+}, {})
 
 INSTRUCTION (cos, {10 COMMA NO_ARGUMENTS}, {
     elem_t value {};
@@ -105,7 +104,7 @@ INSTRUCTION (cos, {10 COMMA NO_ARGUMENTS}, {
     PopValue (spu, &value);
 
     PushValue (spu, cos (value));
-}, {}, {})
+}, {})
 
 INSTRUCTION (sqrt, {11 COMMA NO_ARGUMENTS}, {
     elem_t value {};
@@ -113,47 +112,54 @@ INSTRUCTION (sqrt, {11 COMMA NO_ARGUMENTS}, {
     PopValue (spu, &value);
 
     PushValue (spu, sqrt (value));
-}, {}, {})
+}, {})
 
 INSTRUCTION (jmp, {12 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     Jump (spu, *argument);
-}, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
+}, {JumpDisassemblerCallback})
 
 INSTRUCTION (ja, {13 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, GREATER);
-}, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
+}, {JumpDisassemblerCallback})
 
 INSTRUCTION (jae, {14 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, GREATER | EQUAL);
-}, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
+}, {JumpDisassemblerCallback})
 
 INSTRUCTION (jb, {15 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, LESS);
-}, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
+}, {JumpDisassemblerCallback})
 
 INSTRUCTION (jbe, {16 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, LESS | EQUAL);
-}, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
+}, {JumpDisassemblerCallback})
 
 INSTRUCTION (je, {17 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, EQUAL);
-}, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
+}, {JumpDisassemblerCallback})
 
 INSTRUCTION (jne, {18 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     ConditionalJump (spu, LESS | GREATER);
-}, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
+}, {JumpDisassemblerCallback})
 
 INSTRUCTION (call, {19 COMMA IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT}, {
     PushReturnAddress (spu, (elem_t) (spu->ip));
     Jump (spu, *argument);
 
-}, {JumpAssemblerCallback}, {JumpDisassemblerCallback})
+}, {JumpDisassemblerCallback})
 
 INSTRUCTION (ret, {20 COMMA NO_ARGUMENTS}, {
     elem_t returnAddress = -1;
     PopReturnAddress (spu, &returnAddress);
 
     Jump (spu, returnAddress);
-}, {}, {})
+}, {})
+
+INSTRUCTION (floor, {21 COMMA NO_ARGUMENTS}, {
+    elem_t value {};
+
+    PopValue (spu, &value);
+    PushValue (spu, (ssize_t) (value));
+}, {})
 
 #undef COMMA

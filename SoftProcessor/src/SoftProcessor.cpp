@@ -1,3 +1,5 @@
+#include <SFML/System/Sleep.hpp>
+#include <SFML/System/Time.hpp>
 #include <cstdio>
 #include <cstdlib>
 #include <stddef.h>
@@ -129,6 +131,7 @@ static DebuggerAction ExecuteProgram (SPU *spu, Buffer <DebugInfoChunk> *debugIn
 
 	for (size_t ramIndex = 0; ramIndex < RAM_SIZE + VRAM_SIZE; ramIndex++) {
 		spu->ram [ramIndex] = 0;
+		UpdateGraphics (spu, ramIndex);
 	}
 
 	bool doStep = false;
@@ -304,7 +307,7 @@ static ProcessorErrorCode ReadInstruction (SPU *spu, Buffer <DebugInfoChunk> *br
 
 	ProcessorErrorCode operationErrorCode = instruction->callbackFunction (spu, &commandCode, argumentPointer);
 
-	if ((commandCode.arguments & MEMORY_ARGUMENT) && spu->graphicsEnabled) {
+	if (commandCode.arguments & MEMORY_ARGUMENT) {
 		ProgramErrorCheck(UpdateGraphics (spu, (size_t) (argumentPointer - spu->ram)), "Error occuried while updating graphics");
 	}
 

@@ -89,6 +89,8 @@ static void PrintErrorCode (FILE *stream, ProcessorMessage *message, CONSOLE_COL
     MSG_ (message->errorCode, WRONG_LABEL,        "Label do not exist");
     MSG_ (message->errorCode, WRONG_FREQUENCY,    "Frequency is out of bounds");
     MSG_ (message->errorCode, FORK_ERROR,         "Can not fork process");
+    MSG_ (message->errorCode, WRONG_ADDRESS,      "Wrong ram address has been found");
+
 
     #undef MSG_
 

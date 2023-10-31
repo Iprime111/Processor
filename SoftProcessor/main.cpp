@@ -155,7 +155,7 @@ void SetFrequency (char **arguments) {
         frequency = MAX_FREQUENCY;
     }
 
-    FrequencyTime = MAX_SLEEP_TIME - MAX_SLEEP_TIME * (frequency / MAX_FREQUENCY);
+    FrequencyTime = MAX_SLEEP_TIME - MAX_SLEEP_TIME * frequency / MAX_FREQUENCY;
 
     RETURN;
 }

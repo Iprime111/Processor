@@ -22,6 +22,7 @@
 #include "StringProcessing.h"
 #include "SoftProcessor.h"
 #include "TextTypes.h"
+#include "GraphicsProvider.h"
 
 static ProcessorErrorCode ExecuteCommand (SPU *spu, char *arguments);
 
@@ -29,15 +30,15 @@ static ProcessorErrorCode PlaceBreakpoint  (SPU *spu, char *arguments, Buffer <D
 static ProcessorErrorCode PrintSpuData     (SPU *spu, char *arguments);
 
 static ProcessorErrorCode GetDumpArguments      (char *arguments, ssize_t *dumpAddress, ssize_t *dumpSize, ssize_t maxSize);
-static ArgumentsType      ParseCommandArguments (SPU *spu, char *arguments, unsigned char *registerArgument, elem_t *immedArgument, char *registerName);
-static ProcessorErrorCode GetArgumentsPointer   (SPU *spu, const CommandCode *commandCode, elem_t **argumentPointer, elem_t *immedArgument, unsigned char *registerArgument);
+static ArgumentsType      ParseCommandArguments (SPU *spu, char *arguments, InstructionArguments *argumentValues, char *registerName);
+static ProcessorErrorCode GetArgumentsPointer   (SPU *spu, const CommandCode *commandCode, elem_t **argumentPointer, InstructionArguments *argumentValues);
 
 static void DumpBytecode (SPU *spu, char *arguments);
 static void DumpMemory   (SPU *spu, char *arguments);
 
 static void PrintMemoryValue      (SPU *spu, ssize_t address, char *arguments);
 static void PrintRegister         (SPU *spu, unsigned char registerIndex, char *registerName);
-static void PrintRegisterAndImmed (SPU *spu, unsigned char registerIndex, elem_t value);
+static void PrintRegisterAndImmed (SPU *spu, InstructionArguments *arguments);
 static void PrintImmed            (elem_t value);
 
 static bool HasRamBrackets (TextLine *arguments);
@@ -47,6 +48,10 @@ static char DEBUGGER_ERROR_PREFIX [] = "Debugger";
 
 DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer) {
     PushLog (2);
+
+    custom_assert (spu,               pointer_is_null, QUIT_PROGRAM);
+    custom_assert (debugInfoBuffer,   pointer_is_null, QUIT_PROGRAM);
+    custom_assert (breakpointsBuffer, pointer_is_null, QUIT_PROGRAM);
 
     #define DestroyBufferAndReturn(returnValue) \
             free (input);                       \
@@ -93,20 +98,25 @@ DebuggerAction DebugConsole (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer,
 DebuggerAction BreakpointStop (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer, const DebugInfoChunk *breakpointData, TextBuffer *text) {
     PushLog (2);
 
+    custom_assert (spu,               pointer_is_null, QUIT_PROGRAM);
+    custom_assert (debugInfoBuffer,   pointer_is_null, QUIT_PROGRAM);
+    custom_assert (breakpointsBuffer, pointer_is_null, QUIT_PROGRAM);
+    custom_assert (breakpointData,    pointer_is_null, QUIT_PROGRAM);
+    custom_assert (text,              pointer_is_null, QUIT_PROGRAM);
+
     fprintf (stderr, "\nBreak: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Ip:     " BOLD_WHITE_COLOR "%lu\n", text->lines [breakpointData->line - 1].pointer, breakpointData->address);
 
     RETURN DebugConsole (spu, debugInfoBuffer, breakpointsBuffer);
 }
 
 static void DumpBytecode (SPU *spu, char *arguments) {
-
     PushLog (3);
 
+    custom_assert (spu,       pointer_is_null, (void)0);
     custom_assert (arguments, pointer_is_null, (void)0);
 
     ssize_t dumpAddress = 0;
     ssize_t dumpSize    = 0;
-
 
     if (GetDumpArguments (arguments, &dumpAddress, &dumpSize, spu->bytecode.buffer_size) != NO_PROCESSOR_ERRORS) {
         RETURN;
@@ -137,6 +147,7 @@ static void DumpBytecode (SPU *spu, char *arguments) {
 static void DumpMemory (SPU *spu, char *arguments) {
     PushLog (3);
 
+    custom_assert (spu,       pointer_is_null, (void)0);
     custom_assert (arguments, pointer_is_null, (void)0);
 
     ssize_t dumpAddress = 0;
@@ -167,6 +178,10 @@ static void DumpMemory (SPU *spu, char *arguments) {
 static ProcessorErrorCode GetDumpArguments (char *arguments, ssize_t *dumpAddress, ssize_t *dumpSize, ssize_t maxSize) {
     PushLog (4);
 
+    custom_assert (arguments,   pointer_is_null, TOO_FEW_ARGUMENTS);
+    custom_assert (dumpAddress, pointer_is_null, TOO_FEW_ARGUMENTS);
+    custom_assert (dumpSize,    pointer_is_null, TOO_FEW_ARGUMENTS);
+
     if (sscanf(arguments, "%ld %ld", dumpAddress, dumpSize) < 2) {
         PrintErrorMessage (NO_PROCESSOR_ERRORS, "Incorrect arguments", DEBUGGER_ERROR_PREFIX, NULL, -1);
         RETURN TOO_FEW_ARGUMENTS;
@@ -185,8 +200,10 @@ static ProcessorErrorCode GetDumpArguments (char *arguments, ssize_t *dumpAddres
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ArgumentsType ParseCommandArguments (SPU *spu, char *arguments, unsigned char *registerArgument, elem_t *immedArgument, char *registerName) {
+static ArgumentsType ParseCommandArguments (SPU *spu, char *arguments, InstructionArguments *argumentValues, char *registerName) {
     PushLog (3);
+
+    custom_assert (spu, pointer_is_null, NO_ARGUMENTS);
 
     if (!arguments) {
         RETURN NO_ARGUMENTS;
@@ -204,7 +221,7 @@ static ArgumentsType ParseCommandArguments (SPU *spu, char *arguments, unsigned 
     #define FIND_REGISTER()                                                                                     \
             const Register *foundRegister = FindRegisterByName (registerName);                                  \
             if (foundRegister) {                                                                                \
-                *registerArgument = foundRegister->index;                                                       \
+                argumentValues->registerIndex = foundRegister->index;                                           \
             } else {                                                                                            \
                 PrintErrorMessage (NO_PROCESSOR_ERRORS, "Wrong register name", DEBUGGER_ERROR_PREFIX, NULL, -1);\
                 RETURN NO_ARGUMENTS;                                                                            \
@@ -212,7 +229,7 @@ static ArgumentsType ParseCommandArguments (SPU *spu, char *arguments, unsigned 
 
     ArgumentsType type = NO_ARGUMENTS;
 
-    if (sscanf (argumentsLine.pointer, "%3s+%lf", registerName, immedArgument) == 2) {
+    if (sscanf (argumentsLine.pointer, "%3s+%lf", registerName, &argumentValues->immedArgument) == 2) {
         FIND_REGISTER ();
 
         type = (ArgumentsType) (REGISTER_ARGUMENT | IMMED_ARGUMENT);
@@ -220,10 +237,10 @@ static ArgumentsType ParseCommandArguments (SPU *spu, char *arguments, unsigned 
         if (!isRamValue) {
             RETURN type;
         } else {
-            *immedArgument += spu->registerValues [*registerArgument];
+            argumentValues->immedArgument += spu->registerValues [argumentValues->registerIndex];
         }
 
-    } else if (sscanf (argumentsLine.pointer, "%lf", immedArgument) > 0) {
+    } else if (sscanf (argumentsLine.pointer, "%lf", &argumentValues->immedArgument) > 0) {
         type = IMMED_ARGUMENT;
 
         if (!isRamValue) {
@@ -238,7 +255,7 @@ static ArgumentsType ParseCommandArguments (SPU *spu, char *arguments, unsigned 
         if (!isRamValue) {
             RETURN type;
         } else {
-            *immedArgument = spu->registerValues [*registerArgument];
+            argumentValues->immedArgument = spu->registerValues [argumentValues->registerIndex];
         }
 
     } else {
@@ -253,18 +270,20 @@ static ArgumentsType ParseCommandArguments (SPU *spu, char *arguments, unsigned 
     RETURN NO_ARGUMENTS;
 }
 
-static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const CommandCode *commandCode, elem_t **argumentPointer, elem_t *immedArgument, unsigned char *registerArgument) {
+static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const CommandCode *commandCode, elem_t **argumentPointer, InstructionArguments *argumentValues) {
     PushLog (3);
 
+    custom_assert (spu, pointer_is_null, NO_PROCESSOR);
+
     if (commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT) || commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT)) {
-        spu->tmpArgument = *immedArgument + spu->registerValues [*registerArgument];
+        spu->tmpArgument = argumentValues->immedArgument + spu->registerValues [argumentValues->registerIndex];
         *argumentPointer = &spu->tmpArgument;
 
     } else if (commandCode->arguments & IMMED_ARGUMENT) {
-        *argumentPointer = immedArgument;
+        *argumentPointer = &argumentValues->immedArgument;
 
     } else if (commandCode->arguments & REGISTER_ARGUMENT) {
-        *argumentPointer = spu->registerValues + *registerArgument;
+        *argumentPointer = spu->registerValues + argumentValues->registerIndex;
 
     } else {
         RETURN NO_PROCESSOR_ERRORS;
@@ -272,7 +291,7 @@ static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const CommandCode *comm
 
     if (commandCode->arguments & MEMORY_ARGUMENT) {
         if ((ssize_t) **argumentPointer < 0 || (ssize_t) **argumentPointer >= (ssize_t) (RAM_SIZE + VRAM_SIZE)) {
-			ProgramErrorCheck (TOO_FEW_ARGUMENTS, "Wrong memory address access attempt");
+			ProgramErrorCheck (WRONG_ADDRESS, "Wrong memory address access attempt");
 		}
 
         *argumentPointer = &spu->ram [(ssize_t) **argumentPointer];
@@ -284,6 +303,9 @@ static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const CommandCode *comm
 static ProcessorErrorCode ExecuteCommand (SPU *spu, char *arguments) {
     PushLog (3);
 
+    custom_assert (spu,       pointer_is_null, NO_PROCESSOR);
+    custom_assert (arguments, pointer_is_null, TOO_FEW_ARGUMENTS);
+
     fprintf (stderr, "%s\n", arguments);
 
     char *commandName = strtok (arguments, " ");
@@ -293,12 +315,10 @@ static ProcessorErrorCode ExecuteCommand (SPU *spu, char *arguments) {
         ProgramErrorCheck (WRONG_INSTRUCTION, "Incorrect instruction");
     }
 
-    unsigned char registerArgument = 0;
-    elem_t        immedArgument    = 0;
-
+    InstructionArguments argumentValues = {};
     char registerName [MAX_REGISTER_NAME_LENGTH + 1] = "";
 
-    ArgumentsType argumentTypes = ParseCommandArguments (spu, strtok (NULL, " "), &registerArgument, &immedArgument, registerName);
+    ArgumentsType argumentTypes = ParseCommandArguments (spu, strtok (NULL, " "), &argumentValues, registerName);
 
     CommandCode commandCode = {};
     commandCode.opcode = command->commandCode.opcode;
@@ -310,32 +330,39 @@ static ProcessorErrorCode ExecuteCommand (SPU *spu, char *arguments) {
 
     elem_t *argumentPointer = NULL;
 
-    ProgramErrorCheck (GetArgumentsPointer (spu, &commandCode, &argumentPointer, &immedArgument, &registerArgument), "Can not get argument pointer");
+    ProgramErrorCheck (GetArgumentsPointer (spu, &commandCode, &argumentPointer, &argumentValues), "Can not get argument pointer");
 
-    RETURN command->callbackFunction (spu, &commandCode, argumentPointer);
+    ProcessorErrorCode operationErrorCode = command->callbackFunction (spu, &commandCode, argumentPointer);
+
+    if (commandCode.arguments & MEMORY_ARGUMENT) {
+        ProgramErrorCheck (UpdateGraphics (spu, (size_t) (argumentPointer - spu->ram)), "Error occuried while updating graphics");
+    }
+
+    RETURN operationErrorCode;
 }
 
 static ProcessorErrorCode PrintSpuData (SPU *spu, char *arguments) {
     PushLog (3);
 
-    unsigned char registerArgument = 0;
-    elem_t        immedArgument    = 0;
+    custom_assert (spu,       pointer_is_null, NO_PROCESSOR);
+    custom_assert (arguments, pointer_is_null, TOO_FEW_ARGUMENTS);
 
+    InstructionArguments argumentValues;
     char registerName [MAX_REGISTER_NAME_LENGTH + 1] = "";
 
-    ArgumentsType argumentTypes = ParseCommandArguments (spu, strtok (arguments, " "), &registerArgument, &immedArgument, registerName);
+    ArgumentsType argumentTypes = ParseCommandArguments (spu, strtok (arguments, " "), &argumentValues, registerName);
 
     if (argumentTypes & MEMORY_ARGUMENT) {
-        PrintMemoryValue (spu, (ssize_t) immedArgument, arguments);
+        PrintMemoryValue (spu, (ssize_t) argumentValues.immedArgument, arguments);
 
     } else if (argumentTypes == (REGISTER_ARGUMENT | IMMED_ARGUMENT)) {
-        PrintRegisterAndImmed (spu, registerArgument, immedArgument);
+        PrintRegisterAndImmed (spu, &argumentValues);
 
     } else if (argumentTypes & REGISTER_ARGUMENT) {
-        PrintRegister (spu, registerArgument, registerName);
+        PrintRegister (spu, argumentValues.registerIndex, registerName);
 
     } else if (argumentTypes & IMMED_ARGUMENT) {
-        PrintImmed (immedArgument);
+        PrintImmed (argumentValues.immedArgument);
 
     } else {
         ProgramErrorCheck (TOO_FEW_ARGUMENTS, "Invalid arguments set");
@@ -363,12 +390,14 @@ static void PrintImmed (elem_t value) {
     fprintf (stderr, "%lf", value);
 }
 
-static void PrintRegisterAndImmed (SPU *spu, unsigned char registerIndex, elem_t value) {
-    fprintf (stderr, "%lf", value + spu->registerValues [registerIndex]);
+static void PrintRegisterAndImmed (SPU *spu, InstructionArguments *arguments) {
+    fprintf (stderr, "%lf", arguments->immedArgument + spu->registerValues [arguments->registerIndex]);
 }
 
 static bool HasRamBrackets (TextLine *arguments) {
     PushLog (4);
+
+    custom_assert (argumetns, pointer_is_null, TOO_FEW_ARGUMENTS);
 
     ssize_t end = FindActualStringEnd (arguments);
 
@@ -381,6 +410,10 @@ static bool HasRamBrackets (TextLine *arguments) {
 
 static ProcessorErrorCode PlaceBreakpoint (SPU *spu, char *arguments, Buffer <DebugInfoChunk> *debugInfoBuffer, Buffer <DebugInfoChunk> *breakpointsBuffer) {
     PushLog (3);
+
+    custom_assert (spu,               pointer_is_null, NO_PROCESSOR);
+    custom_assert (debugInfoBuffer,   pointer_is_null, NO_BUFFER);
+    custom_assert (breakpointsBuffer, pointer_is_null, NO_BUFFER);
 
     DebugInfoChunk patternBreakpoint = {};
     DebugInfoChunk *foundAddress = NULL;
@@ -411,6 +444,10 @@ static ProcessorErrorCode PlaceBreakpoint (SPU *spu, char *arguments, Buffer <De
 ProcessorErrorCode ReadSourceFile (FileBuffer *fileBuffer, TextBuffer *text, const char *filename) {
     PushLog (3);
 
+    custom_assert (fileBuffer, pointer_is_null, NO_BUFFER);
+    custom_assert (text,       pointer_is_null, NO_BUFFER);
+    custom_assert (fileBuffer, pointer_is_null, OUTPUT_FILE_ERROR);
+
     #define CheckError(function, msg)               \
         if (!function)                              \
             ProgramErrorCheck (NO_BUFFER, msg);
@@ -435,6 +472,8 @@ ProcessorErrorCode InitDebugConsole () {
 
 static void ShowDebuggerLogo (FILE *stream) {
     PushLog (4);
+
+    custom_assert (stream, pointer_is_null, OUTPUT_FILE_ERROR);
 
     char logo [] = {
         "                               __     __\n"

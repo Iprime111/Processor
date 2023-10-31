@@ -236,7 +236,7 @@ static ProcessorErrorCode ReadArguments (const AssemblerInstruction *instruction
 
     #undef REGISTER
 
-    #define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK, DISASSEMBLER_CALLBACK)  \
+    #define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, DISASSEMBLER_CALLBACK)                      \
     if (instruction->commandCode.opcode == ((CommandCode) COMMAND_CODE).opcode) {                           \
         DISASSEMBLER_CALLBACK                                                                               \
     }
@@ -256,7 +256,7 @@ static ProcessorErrorCode ReadArguments (const AssemblerInstruction *instruction
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-#define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, ASSEMBLER_CALLBACK, DISASSEMBLER_CALLBACK)  \
+#define INSTRUCTION(NAME, COMMAND_CODE, PROCESSOR_CALLBACK, DISASSEMBLER_CALLBACK)                      \
             INSTRUCTION_CALLBACK_FUNCTION (NAME) {                                                      \
                 return NO_PROCESSOR_ERRORS;                                                             \
             }
