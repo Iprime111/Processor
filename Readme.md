@@ -108,7 +108,7 @@ Processor uses sfml launched in main thread to display image from virtual `VRAM`
 ### Basic syntax
 Every not blank line (except line with only comments in it) consists of a command and it's arguments. If there're two arguments specified, they should be splitted by a plus sign `+` (without whitespace) and register argument should come first. Line may have a comment that starts from `;` symbol. Every line should have one or zero instructions on it. Every program execution should end with `hlt` command for correct behaviour. Example:
 
-```
+```asm
 ; This program reads value, multiplies by 5 and prints it
 
 push 5  ; push 5 to a stack
@@ -151,7 +151,7 @@ There are 23 processor instructions in current assembler version. Each one is sh
 ### Registers
 There are 8 available registers from rax to rhx. Each one contains numeric value that can be used in program. Example
 
-```
+```asm
 ; This program reads value, squares and prints it
 
 in          ; read value
@@ -168,7 +168,7 @@ hlt         ; Stop processor
 ### Two arguments
 Two arguments can be passed to some instructions by using plus sign without whitespaces beetwen them. Their values will be added and passed to a command. Example:
 
-```
+```asm
 ; This program adds 5 to a given number, and prints the result
 
 in          ; Read value
