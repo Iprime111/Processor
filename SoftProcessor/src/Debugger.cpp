@@ -104,7 +104,10 @@ DebuggerAction BreakpointStop (SPU *spu, Buffer <DebugInfoChunk> *debugInfoBuffe
     custom_assert (breakpointData,    pointer_is_null, QUIT_PROGRAM);
     custom_assert (text,              pointer_is_null, QUIT_PROGRAM);
 
-    fprintf (stderr, "\nBreak: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Ip:     " BOLD_WHITE_COLOR "%lu\n", text->lines [breakpointData->line - 1].pointer, breakpointData->address);
+    size_t lineBegin = FindActualStringBegin (&text->lines [breakpointData->line - 1]);
+
+    fprintf (stderr, "\nBreak: " BOLD_WHITE_COLOR "%s\n" WHITE_COLOR "Line:  " BOLD_WHITE_COLOR "%d\n" WHITE_COLOR "Ip:    " BOLD_WHITE_COLOR "%lu\n",
+                text->lines [breakpointData->line - 1].pointer + lineBegin, breakpointData->line,breakpointData->address);
 
     RETURN DebugConsole (spu, debugInfoBuffer, breakpointsBuffer);
 }

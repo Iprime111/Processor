@@ -328,13 +328,16 @@ static ProcessorErrorCode GetArgumentsPointer (SPU *spu, const AssemblerInstruct
 	elem_t immedArgument = NAN;
 	unsigned char registerIndex = 0;
 
-	if (commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT) || commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT)) {
+	if (commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT) ||
+			commandCode->arguments == (IMMED_ARGUMENT | REGISTER_ARGUMENT | MEMORY_ARGUMENT)) {
+
 		ReadData (spu, &registerIndex, unsigned char);
 		ReadData (spu, &immedArgument, elem_t);
 
 		spu->tmpArgument = spu->registerValues [registerIndex] + immedArgument;
 
 		*argumentPointer = &spu->tmpArgument;
+		
 	}else if (commandCode->arguments & REGISTER_ARGUMENT) {
 		ReadData (spu, &registerIndex, unsigned char);
 

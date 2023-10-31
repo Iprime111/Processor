@@ -95,8 +95,12 @@ ProcessorErrorCode UpdateGraphics (SPU *spu, size_t ramAddress) {
     custom_assert (spu,      pointer_is_null, NO_PROCESSOR);
     custom_assert (spu->ram, pointer_is_null, NO_BUFFER);
 
-    if (ramAddress >= VRAM_SIZE) {
+    if (ramAddress >= VRAM_SIZE + RAM_SIZE) {
         RETURN WRONG_ADDRESS;
+    }
+
+    if (ramAddress >= VRAM_SIZE) {
+        RETURN NO_PROCESSOR_ERRORS;
     }
 
     if (!spu->graphicsEnabled) {

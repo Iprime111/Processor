@@ -10,6 +10,10 @@ static const Register Registers [REGISTER_COUNT] = {
     REGISTER (rbx, 1),
     REGISTER (rcx, 2),
     REGISTER (rdx, 3),
+    REGISTER (rex, 4),
+    REGISTER (rfx, 5),
+    REGISTER (rgx, 6),
+    REGISTER (rhx, 7),
 };
 
 #undef REGISTER
