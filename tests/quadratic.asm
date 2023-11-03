@@ -66,7 +66,7 @@ Linear:
 
 Constant:
     push rcx
-    push 0
+    push 0 
     je Infinite
 
     push 0

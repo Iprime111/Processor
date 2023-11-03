@@ -190,7 +190,7 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
     RETURN NO_PROCESSOR_ERRORS;
 }
 
-static ProcessorErrorCode CompileInstructionOpcode (TextLine *line, AssemblerInstruction *instruction,
+static ProcessorErrorCode CompileInstructionOpcode  (TextLine *line, AssemblerInstruction *instruction,
                                                         ArgumentsType *permittedArguments, int lineNumber) {
     PushLog (3);
 

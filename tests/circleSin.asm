@@ -2,7 +2,7 @@ in
 pop rdx             ; read r
 
 push 0
-pop rax
+pop rax             ; rax - t parameter
 
 Begin:
     push rax
