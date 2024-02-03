@@ -181,11 +181,10 @@ static ProcessorErrorCode CompileLine (Buffer <char> *binaryBuffer, Buffer <char
         ProgramErrorCheck (WriteDataToBuffer (debugInfoBuffer, &commandDebugInfo, 1),
                             "Error occuried while writing debug information to a buffer");
     }
-
-    ProgramErrorCheck (EmitInstructionBinary  (binaryBuffer,                &outputInstruction, &arguments, line, lineNumber),
-                                                    "Error occuried while emitting instruction to a binary");
     ProgramErrorCheck (EmitInstructionListing (binaryBuffer, listingBuffer, &outputInstruction, &arguments, line, lineNumber),
                                                      "Error occuried while emitting instruction to a listing");
+    ProgramErrorCheck (EmitInstructionBinary  (binaryBuffer,                &outputInstruction, &arguments, line, lineNumber),
+                                                    "Error occuried while emitting instruction to a binary");
 
     RETURN NO_PROCESSOR_ERRORS;
 }

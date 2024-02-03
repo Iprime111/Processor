@@ -9,12 +9,12 @@
 #include "Registers.h"
 #include "Stack/Stack.h"
 
-const size_t RAM_SIZE = 100;                    // ram and vram sizes
+const size_t RAM_SIZE = 1000;                   // ram and vram sizes
 const size_t VRAM_SIZE = 30000;
 
 const unsigned int MIN_FREQUENCY = 1;           // minimal and maximal frequency (in MHz) for processor clocking
 const unsigned int MAX_FREQUENCY = 4200;
-const useconds_t MAX_SLEEP_TIME = 4200;        // Sleep time when minimal frequency is set
+const useconds_t MAX_SLEEP_TIME  = 4200;        // Sleep time when minimal frequency is set
 
 struct DebugInfoChunk {
     size_t address;

@@ -9,7 +9,6 @@
 #include "FileIO.h"
 #include "Logger.h"
 #include "MessageHandler.h"
-#include "SecureStack/SecureStack.h"
 #include "TextTypes.h"
 #include "Assembler.h"
 
